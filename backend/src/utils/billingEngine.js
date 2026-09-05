@@ -86,7 +86,7 @@ class BillingEngine {
       const invoice = new Invoice({
         quotation: quotation._id,
         customer: quotation.customer._id,
-        type: oneTimeLines.length > 0 && subscriptionLines.length > 0 ? 'mixed' : 'one-time',
+        type: quotation.lines.some(line => line.lineType === 'subscription') ? 'mixed' : 'one-time',
         lines: invoiceLines,
         subtotal: subtotal,
         totalTax: totalTax,
@@ -99,6 +99,7 @@ class BillingEngine {
       
       // Update quotation with invoice reference
       quotation.invoice = invoice._id;
+      quotation.status = 'invoiced';
       await quotation.save();
       
       return invoice;

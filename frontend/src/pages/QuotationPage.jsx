@@ -92,7 +92,7 @@ const QuotationPage = () => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get('/api/users/customers');
+      const response = await axios.get('/api/auth/customers');
       setCustomers(response.data.data);
     } catch (error) {
       // Set demo customers
@@ -221,19 +221,19 @@ const QuotationPage = () => {
   });
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f5f7fa' }}>
+    <Box className="quotation-page" sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <Navbar />
 
-      <Box sx={{ flex: 1, p: 3 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Quotation Builder
-        </Typography>
+      <Box className="quotation-content" sx={{ flex: 1 }}>
+        <Typography className="page-eyebrow">Commercial workspace</Typography>
+        <Typography className="page-title" component="h1">Quotation builder</Typography>
+        <Typography className="page-description" sx={{ mb: 3 }}>Shape a proposal, check the risk, and send it forward with confidence.</Typography>
 
         <Grid container spacing={3}>
           {/* Left Column - Products */}
           <Grid item xs={12} lg={7}>
             {/* Customer Selection */}
-            <Paper sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+            <Paper className="quote-panel" sx={{ p: 2, mb: 2 }}>
               <Grid container spacing={2} alignItems="center">
                 <Grid item xs={12} md={6}>
                   <FormControl fullWidth size="small">
@@ -272,7 +272,7 @@ const QuotationPage = () => {
             </Paper>
 
             {/* Product Search & Filter */}
-            <Paper sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+            <Paper className="quote-panel" sx={{ p: 2, mb: 2 }}>
               <Grid container spacing={2} alignItems="center">
                 <Grid item xs={12} md={6}>
                   <TextField
@@ -309,7 +309,7 @@ const QuotationPage = () => {
             <Grid container spacing={2}>
               {filteredProducts.map(product => (
                 <Grid item xs={12} sm={6} md={4} key={product._id}>
-                  <Card
+                  <Card className="product-card"
                     sx={{
                       height: '100%',
                       display: 'flex',
@@ -369,7 +369,7 @@ const QuotationPage = () => {
 
           {/* Right Column - Cart */}
           <Grid item xs={12} lg={5}>
-            <Paper sx={{ p: 2, borderRadius: 2, position: 'sticky', top: 80 }}>
+            <Paper className="cart-panel" sx={{ p: 2, position: 'sticky', top: 80 }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6">
                   <ShoppingCart sx={{ mr: 1, verticalAlign: 'middle' }} />
@@ -456,6 +456,8 @@ const QuotationPage = () => {
               )}
 
               <Divider sx={{ my: 2 }} />
+
+              {showUpsell && <UpsellPanel />}
 
               {/* Totals */}
               <Box>

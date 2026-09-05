@@ -9,7 +9,9 @@ const {
   approveQuotation,
   rejectQuotation,
   deleteQuotation,
-  getRiskScore
+  getRiskScore,
+  requestNegotiation,
+  confirmQuotation
 } = require('../controllers/quotationController');
 
 
@@ -31,5 +33,7 @@ router.post('/:id/reject', rejectQuotation);
 
 // Risk score
 router.get('/:id/risk', getRiskScore);
+router.post('/:id/negotiate', requestNegotiation);
+router.post('/:id/confirm', confirmQuotation);
 
 module.exports = router;

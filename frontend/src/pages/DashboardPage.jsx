@@ -1,5 +1,6 @@
 // frontend/src/pages/DashboardPage.jsx
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { 
   Grid, 
   Paper, 
@@ -9,10 +10,13 @@ import {
   CardContent,
   IconButton,
   Chip,
-  Avatar
+  Avatar,
+  Badge,
+  Button,
+  LinearProgress,
+  Container
 } from '@mui/material';
 import { 
-  TrendingUp, 
   TrendingDown, 
   AttachMoney, 
   ShoppingCart,
@@ -20,20 +24,37 @@ import {
   CheckCircle,
   Schedule,
   Refresh,
-  People
+  People,
+  ArrowUpward,
+  ArrowDownward,
+  Assessment,
+  RocketLaunch
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/common/Navbar';
 
+const revenueData = [
+  { month: 'Jan', revenue: 18 },
+  { month: 'Feb', revenue: 24 },
+  { month: 'Mar', revenue: 21 },
+  { month: 'Apr', revenue: 31 },
+  { month: 'May', revenue: 36 },
+  { month: 'Jun', revenue: 42 },
+];
+
 const DashboardPage = () => {
   const { user } = useAuth();
+  const { isConnected } = useSocket();
   const [stats, setStats] = useState({
     totalQuotes: 0,
     pendingApprovals: 0,
     activeDeals: 0,
     revenue: 0,
+    conversionRate: 68,
     stalledDeals: [],
     anomalies: []
   });
@@ -55,50 +76,44 @@ const DashboardPage = () => {
     }
   };
 
-  const StatCard = ({ title, value, icon, color, subtitle }) => (
-    <Card sx={{ height: '100%', position: 'relative' }}>
-      <CardContent>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Box>
-            <Typography variant="caption" color="textSecondary" gutterBottom>
-              {title}
-            </Typography>
-            <Typography variant="h4" fontWeight="bold">
-              {value}
-            </Typography>
-            {subtitle && (
-              <Typography variant="caption" color="textSecondary">
-                {subtitle}
-              </Typography>
-            )}
+  const StatCard = ({ title, value, icon, color, subtitle, growth }) => (
+    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
+      <Card className="stat-card dashboard-stat" sx={{ height: '100%' }}>
+        <CardContent>
+          <Box display="flex" justifyContent="space-between" alignItems="center" gap={2}>
+            <Box>
+              <Typography variant="caption" color="textSecondary" fontWeight="600">{title}</Typography>
+              <Typography variant="h4" fontWeight="800" sx={{ mt: 0.5 }}>{value}</Typography>
+              {subtitle && <Typography variant="caption" color="textSecondary">{subtitle}</Typography>}
+              {growth && <Chip size="small" label={growth} icon={growth.startsWith('+') ? <ArrowUpward fontSize="small" /> : <ArrowDownward fontSize="small" />} color={growth.startsWith('+') ? 'success' : 'warning'} sx={{ mt: 1, fontWeight: 700 }} />}
+            </Box>
+            <Avatar className="stat-icon" sx={{ bgcolor: color, width: 54, height: 54, borderRadius: 2 }}>{icon}</Avatar>
           </Box>
-          <Avatar sx={{ bgcolor: color }}>
-            {icon}
-          </Avatar>
-        </Box>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
+    <Box className="dashboard-page" sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <Navbar />
       
-      <Box sx={{ flex: 1, p: 3 }}>
+      <Container maxWidth="xl" className="dashboard-content" sx={{ flex: 1 }}>
         {/* Header */}
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box className="dashboard-header" display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Box>
-            <Typography variant="h4" fontWeight="bold">
-              Welcome back, {user?.name}!
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Here's what's happening with your deals today
-            </Typography>
+            <Typography className="page-eyebrow">Daily command center</Typography>
+            <Typography className="dashboard-greeting">Welcome back, {user?.name || 'there'}.</Typography>
+            <Typography className="page-description">Here is what is moving across your deal pipeline today.</Typography>
           </Box>
-          <IconButton onClick={fetchDashboardData} color="primary">
-            <Refresh />
-          </IconButton>
+          <Box className="dashboard-actions">
+            <Badge color={isConnected ? 'success' : 'error'} variant="dot"><Chip label={isConnected ? 'Live' : 'Offline'} size="small" /></Badge>
+            <IconButton onClick={fetchDashboardData} className="refresh-button" aria-label="Refresh dashboard"><Refresh /></IconButton>
+            <Button variant="contained" startIcon={<RocketLaunch />} onClick={() => { window.location.href = '/quotations'; }}>New quotation</Button>
+          </Box>
         </Box>
+
+        {loading && <LinearProgress color="primary" sx={{ mb: 2, borderRadius: 4 }} />}
 
         {/* Stats Grid */}
         <Grid container spacing={3} mb={3}>
@@ -107,7 +122,8 @@ const DashboardPage = () => {
               title="Active Deals"
               value={stats.activeDeals}
               icon={<ShoppingCart />}
-              color="#1976d2"
+              color="var(--primary)"
+              growth="+8.2%"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -115,8 +131,9 @@ const DashboardPage = () => {
               title="Pending Approvals"
               value={stats.pendingApprovals}
               icon={<Schedule />}
-              color="#ed6c02"
+              color="var(--warning)"
               subtitle={`${stats.pendingApprovals} need review`}
+              growth="-2.1%"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -124,19 +141,41 @@ const DashboardPage = () => {
               title="Total Revenue"
               value={`₹${(stats.revenue / 100000).toFixed(1)}L`}
               icon={<AttachMoney />}
-              color="#2e7d32"
+              color="var(--success)"
               subtitle="This month"
+              growth="+22.5%"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
-              title="Total Quotations"
-              value={stats.totalQuotes}
-              icon={<TrendingUp />}
-              color="#9c27b0"
+              title="Conversion rate"
+              value={`${stats.conversionRate}%`}
+              icon={<Assessment />}
+              color="var(--secondary)"
+              subtitle="Quotes to deals"
+              growth="+5.3%"
             />
           </Grid>
         </Grid>
+
+        <Paper className="revenue-panel" elevation={0}>
+          <Box className="chart-heading">
+            <Box><Typography className="panel-kicker">Performance overview</Typography><Typography variant="h6">Revenue movement</Typography></Box>
+            <Chip label="Last 6 months" size="small" variant="outlined" />
+          </Box>
+          <Box className="revenue-chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={revenueData} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}>
+                <defs><linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#0EA5E9" stopOpacity={0.35} /><stop offset="100%" stopColor="#0EA5E9" stopOpacity={0.02} /></linearGradient></defs>
+                <CartesianGrid stroke="#e0f2fe" vertical={false} />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} tickFormatter={(value) => `₹${value}L`} />
+                <Tooltip formatter={(value) => [`₹${value}L`, 'Revenue']} contentStyle={{ borderRadius: 12, border: '1px solid #bae6fd' }} />
+                <Area type="monotone" dataKey="revenue" stroke="#0284C7" strokeWidth={3} fill="url(#revenueFill)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </Box>
+        </Paper>
 
         {/* Alerts Section */}
         <Grid container spacing={3}>
@@ -215,7 +254,7 @@ const DashboardPage = () => {
             </Box>
           </Grid>
         </Grid>
-      </Box>
+      </Container>
     </Box>
   );
 };

@@ -21,12 +21,10 @@ import {
   Logout,
   Dashboard,
   ShoppingCart,
-  Assessment,
   Store
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
 
 const Navbar = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
@@ -73,7 +71,7 @@ const Navbar = ({ onMenuClick }) => {
   ];
 
   return (
-    <AppBar position="sticky" color="default" elevation={1} sx={{ bgcolor: 'white' }}>
+    <AppBar className="app-navbar" position="sticky" color="default" elevation={0}>
       <Toolbar>
         <IconButton
           edge="start"
@@ -100,7 +98,7 @@ const Navbar = ({ onMenuClick }) => {
         </Box>
 
         {/* Navigation Links */}
-        <Box display={{ xs: 'none', md: 'flex' }} gap={1} mr={2}>
+        <Box className="nav-links" display={{ xs: 'none', md: 'flex' }} gap={1} mr={2}>
           <Button
             component={Link}
             to="/dashboard"
@@ -117,6 +115,8 @@ const Navbar = ({ onMenuClick }) => {
           >
             Quotations
           </Button>
+          <Button component={Link} to="/reports" size="small">Reports</Button>
+          <Button component={Link} to="/billing" size="small">Billing</Button>
           {user?.role === 'admin' && (
             <Button
               component={Link}

@@ -45,6 +45,7 @@ exports.createQuotation = async (req, res) => {
       processedLines.push({
         product: product._id,
         productName: product.name,
+        category: product.category,
         quantity: line.quantity,
         unitPrice: unitPrice,
         discountPercent: line.discountPercent || 0,
@@ -199,7 +200,9 @@ exports.getQuotation = async (req, res) => {
 // @access  Private
 exports.updateQuotation = async (req, res) => {
   try {
-    const quotation = await Quotation.findById(req.params.id);
+    const quotation = await Quotation.findById(req.params.id)
+      .populate('lines.product')
+      .populate('customer', 'name email tier');
 
     if (!quotation) {
       return res.status(404).json({
@@ -235,6 +238,7 @@ exports.updateQuotation = async (req, res) => {
         processedLines.push({
           product: product._id,
           productName: product.name,
+          category: product.category,
           quantity: line.quantity,
           unitPrice: unitPrice,
           discountPercent: line.discountPercent || 0,
@@ -348,6 +352,7 @@ exports.approveQuotation = async (req, res) => {
         const warehouses = await require('../models/Warehouse').find({ isActive: true });
         const splitResult = optimizeWarehouseSplit(quotation.lines, warehouses);
         quotation.warehouseSplit = splitResult.split;
+        await Promise.all(warehouses.map((warehouse) => warehouse.save()));
       } catch (error) {
         console.error('Warehouse split error:', error);
       }
@@ -559,5 +564,68 @@ exports.getRiskScore = async (req, res) => {
       success: false,
       message: 'Server error'
     });
+  }
+};
+
+const canAccessQuotation = (quotation, user) => {
+  if (['admin', 'sales_manager', 'finance'].includes(user.role)) return true;
+  return quotation.customer.toString() === user.id || quotation.salesRep.toString() === user.id;
+};
+
+exports.requestNegotiation = async (req, res) => {
+  try {
+    const { message, requestedDiscount } = req.body;
+    const quotation = await Quotation.findById(req.params.id);
+    if (!quotation) return res.status(404).json({ success: false, message: 'Quotation not found' });
+    if (!canAccessQuotation(quotation, req.user)) return res.status(403).json({ success: false, message: 'Not authorized to negotiate this quotation' });
+    if (!message && requestedDiscount === undefined) return res.status(400).json({ success: false, message: 'Add a message or requested discount' });
+
+    quotation.negotiation.status = 'pending';
+    if (requestedDiscount !== undefined) quotation.negotiation.requestedDiscount = Number(requestedDiscount);
+    if (message) quotation.negotiation.comments.push({ user: req.user.id, message, timestamp: new Date() });
+    quotation.approvalStatus = 'negotiation';
+    quotation.status = 'sent';
+    quotation.auditLog.push({ user: req.user.id, action: 'Negotiation requested', reason: message || 'Discount requested' });
+    await quotation.save();
+    res.status(200).json({ success: true, message: 'Negotiation request submitted', data: quotation });
+  } catch (error) {
+    console.error('Negotiation request error:', error);
+    res.status(500).json({ success: false, message: 'Unable to submit negotiation request' });
+  }
+};
+
+exports.confirmQuotation = async (req, res) => {
+  try {
+    const quotation = await Quotation.findById(req.params.id);
+    if (!quotation) return res.status(404).json({ success: false, message: 'Quotation not found' });
+    if (!canAccessQuotation(quotation, req.user)) return res.status(403).json({ success: false, message: 'Not authorized to confirm this quotation' });
+    if (['cancelled', 'rejected'].includes(quotation.status)) return res.status(400).json({ success: false, message: 'Quotation cannot be confirmed' });
+
+    const requestedDiscount = Number(quotation.negotiation.requestedDiscount || 0);
+    if (requestedDiscount > 0) {
+      quotation.lines.forEach((line) => { line.discountPercent = Math.max(line.discountPercent || 0, requestedDiscount); });
+      const customer = await User.findById(quotation.customer);
+      const riskScore = calculateBlendedRiskScore(quotation.lines, customer?.tier);
+      quotation.blendedRiskScore = riskScore;
+      if (riskScore.needsFinanceApproval || riskScore.needsManagerApproval) {
+        quotation.approvalStatus = riskScore.needsFinanceApproval ? 'pending-finance' : 'pending-manager';
+        quotation.approvalChain = [{ role: 'manager', status: 'pending' }];
+        if (riskScore.needsFinanceApproval) quotation.approvalChain.push({ role: 'finance', status: 'pending' });
+        quotation.auditLog.push({ user: req.user.id, action: 'Confirmation returned to approval', reason: 'Negotiated terms exceeded discount threshold' });
+        await quotation.save();
+        return res.status(200).json({ success: true, message: 'Terms require approval again', data: quotation });
+      }
+    }
+
+    quotation.negotiation.status = 'accepted';
+    quotation.status = 'confirmed';
+    quotation.approvalStatus = 'approved';
+    quotation.negotiation.finalTerms = { discount: requestedDiscount, amount: quotation.totalAmount };
+    quotation.auditLog.push({ user: req.user.id, action: 'Quotation confirmed' });
+    await quotation.save();
+    res.status(200).json({ success: true, message: 'Quotation confirmed', data: quotation });
+  } catch (error) {
+    console.error('Quotation confirmation error:', error);
+    res.status(500).json({ success: false, message: 'Unable to confirm quotation' });
   }
 };

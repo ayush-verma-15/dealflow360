@@ -3,7 +3,7 @@ const invoiceSchema = new mongoose.Schema({
   invoiceNumber: {
     type: String,
     unique: true,
-    required: true
+    required: false
   },
   quotation: {
     type: mongoose.Schema.Types.ObjectId,

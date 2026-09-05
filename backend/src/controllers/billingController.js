@@ -5,6 +5,13 @@ const Subscription = require('../models/Subscription');
 const Payment = require('../models/Payment');
 const Quotation = require('../models/Quotation');
 
+const canAccessInvoice = async (invoice, user) => {
+  if (['admin', 'finance', 'sales_manager'].includes(user.role)) return true;
+  if (invoice.customer.toString() === user.id) return true;
+  const quotation = await Quotation.findById(invoice.quotation).select('salesRep');
+  return quotation?.salesRep?.toString() === user.id;
+};
+
 // 🔥 Generate billing schedule
 exports.generateBillingSchedule = async (req, res) => {
   try {
@@ -42,6 +49,7 @@ exports.getInvoice = async (req, res) => {
         message: 'Invoice not found'
       });
     }
+    if (!await canAccessInvoice(invoice, req.user)) return res.status(403).json({ success: false, message: 'Not authorized to view this invoice' });
     
     res.status(200).json({
       success: true,
@@ -111,6 +119,9 @@ exports.processPayment = async (req, res) => {
       });
     }
     
+    const invoice = await Invoice.findById(invoiceId);
+    if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
+    if (!await canAccessInvoice(invoice, req.user)) return res.status(403).json({ success: false, message: 'Not authorized to pay this invoice' });
     const result = await BillingEngine.processPayment(invoiceId, { method, notes });
     
     res.status(200).json({

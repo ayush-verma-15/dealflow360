@@ -5,7 +5,7 @@ const paymentSchema = new mongoose.Schema({
   paymentNumber: {
     type: String,
     unique: true,
-    required: true
+    required: false
   },
   invoice: {
     type: mongoose.Schema.Types.ObjectId,

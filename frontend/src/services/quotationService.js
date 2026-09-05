@@ -1,0 +1,11 @@
+import api from './api';
+export const getQuotations = (params) => api.get('/quotes', { params });
+export const getQuotation = (id) => api.get(`/quotes/${id}`);
+export const createQuotation = (payload) => api.post('/quotes', payload);
+export const updateQuotation = (id, payload) => api.put(`/quotes/${id}`, payload);
+export const getRiskScore = (id) => api.get(`/quotes/${id}/risk`);
+export const approveQuotation = (id, reason) => api.post(`/quotes/${id}/approve`, { reason });
+export const rejectQuotation = (id, reason) => api.post(`/quotes/${id}/reject`, { reason });
+export const negotiateQuotation = (id, payload) => api.post(`/quotes/${id}/negotiate`, payload);
+export const confirmQuotation = (id) => api.post(`/quotes/${id}/confirm`);
+export default { getQuotations, getQuotation, createQuotation, updateQuotation, getRiskScore, approveQuotation, rejectQuotation, negotiateQuotation, confirmQuotation };

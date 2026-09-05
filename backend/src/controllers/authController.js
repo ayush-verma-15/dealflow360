@@ -229,3 +229,15 @@ exports.updateProfile = async (req, res) => {
     });
   }
 };
+
+exports.getCustomers = async (req, res) => {
+  try {
+    const customers = await User.find({ role: 'customer', isActive: true })
+      .select('name email tier company')
+      .sort({ name: 1 });
+    res.status(200).json({ success: true, count: customers.length, data: customers });
+  } catch (error) {
+    console.error('Get customers error:', error);
+    res.status(500).json({ success: false, message: 'Unable to load customers' });
+  }
+};

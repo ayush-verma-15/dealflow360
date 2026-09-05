@@ -21,4 +21,4 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   return children;
 };
 
-export default ProtectedRoute;
+export default ProtectedRoute;  // ✅ Default export hona chahiye

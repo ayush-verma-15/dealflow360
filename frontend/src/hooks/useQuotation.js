@@ -1,0 +1,3 @@
+import { useCallback, useState } from 'react';
+import quotationService from '../services/quotationService';
+export default function useQuotation() { const [quotation, setQuotation] = useState(null); const [loading, setLoading] = useState(false); const load = useCallback(async (id) => { setLoading(true); try { const response = await quotationService.getQuotation(id); setQuotation(response.data.data); return response.data.data; } finally { setLoading(false); } }, []); return { quotation, loading, load, createQuotation: quotationService.createQuotation, updateQuotation: quotationService.updateQuotation }; }

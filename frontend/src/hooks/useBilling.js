@@ -1,0 +1,3 @@
+import { useCallback, useEffect, useState } from 'react';
+import billingService from '../services/billingService';
+export default function useBilling() { const [invoices, setInvoices] = useState([]); const [loading, setLoading] = useState(false); const refresh = useCallback(async () => { setLoading(true); try { const response = await billingService.getInvoices(); setInvoices(response.data.data || []); return response.data.data || []; } finally { setLoading(false); } }, []); useEffect(() => { refresh(); }, [refresh]); return { invoices, loading, refresh, processPayment: billingService.processPayment }; }

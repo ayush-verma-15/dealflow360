@@ -4,7 +4,6 @@ const Product = require('../models/Product');
 const User = require('../models/User');
 const calculateBlendedRiskScore = require('../utils/blendedRiskScore');
 const optimizeWarehouseSplit = require('../utils/warehouseSplit');
-
 // @desc    Create quotation
 // @route   POST /api/quotes
 // @access  Private

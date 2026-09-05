@@ -15,3 +15,12 @@
 ## 📁 My Files
 
 ### Models
+
+## 👥 Team Members & Roles
+
+| Name | Role | Badge | Responsibilities |
+|------|------|-------|------------------|
+| **Ayush** | Team Leader / Backend Core | 🧠 | Project setup, architecture, approval logic, team coordination, authentication, quotation CRUD, blended risk score |
+| **Nishank** | Backend / Inventory | ⚙️ | Warehouse logic, stock management, fulfillment, product management, warehouse split optimizer |
+| **Vaibhav** | Frontend / UI | 🎨 | React components, customer portal, dashboard, responsive design, UI/UX |
+| **Rohan** | Full Stack / Integration | 🔗 | Billing engine, subscriptions, API integration, testing, reporting, deployment |

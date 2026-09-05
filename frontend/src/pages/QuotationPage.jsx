@@ -1,10 +1,10 @@
-// frontend/src/pages/QuotationPage.jsx
+
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Grid, 
-  Paper, 
-  Typography, 
+import {
+  Box,
+  Grid,
+  Paper,
+  Typography,
   Button,
   TextField,
   Select,
@@ -21,19 +21,27 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Tabs,
+  Tab,
+  Badge,
+  Tooltip
 } from '@mui/material';
-import { 
-  Add, 
-  Remove, 
-  Delete, 
+import {
+  Add,
+  Remove,
+  Delete,
   TrendingUp,
   Check,
   Close,
   ShoppingCart,
   LocalOffer,
   Warning,
-  Info
+  Info,
+  Search,
+  FilterList,
+  Refresh,
+  AttachMoney
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
@@ -41,7 +49,6 @@ import toast from 'react-hot-toast';
 import Navbar from '../components/common/Navbar';
 import UpsellPanel from '../components/quotation/UpsellPanel';
 import WarehouseSplit from '../components/warehouse/WarehouseSplit';
-import ApprovalStatus from '../components/quotation/ApprovalStatus';
 
 const QuotationPage = () => {
   const { user } = useAuth();
@@ -56,6 +63,9 @@ const QuotationPage = () => {
   const [quotationStatus, setQuotationStatus] = useState('draft');
   const [approvalStatus, setApprovalStatus] = useState(null);
   const [quoteId, setQuoteId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [tabValue, setTabValue] = useState(0);
 
   useEffect(() => {
     fetchProducts();
@@ -68,19 +78,28 @@ const QuotationPage = () => {
       setProducts(response.data.data);
     } catch (error) {
       toast.error('Failed to load products');
+      // Set demo products
+      setProducts([
+        { _id: '1', name: 'Laptop Pro', category: 'Hardware', basePrice: 50000, stock: 100, isPromoted: true },
+        { _id: '2', name: 'Server Rack', category: 'Hardware', basePrice: 150000, stock: 50, isPromoted: false },
+        { _id: '3', name: 'Setup Service', category: 'Service', basePrice: 25000, stock: 999, isPromoted: false },
+        { _id: '4', name: 'Annual Maintenance', category: 'Subscription', basePrice: 12000, stock: 999, isPromoted: true },
+        { _id: '5', name: 'Cloud Storage', category: 'Subscription', basePrice: 5000, stock: 999, isPromoted: false },
+        { _id: '6', name: 'Data Migration', category: 'Service', basePrice: 35000, stock: 999, isPromoted: false },
+      ]);
     }
   };
 
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get('/api/customers');
+      const response = await axios.get('/api/users/customers');
       setCustomers(response.data.data);
     } catch (error) {
       // Set demo customers
       setCustomers([
-        { _id: '1', name: 'Acme Corp', tier: 'Gold' },
-        { _id: '2', name: 'Beta Industries', tier: 'Silver' },
-        { _id: '3', name: 'Gamma Solutions', tier: 'Bronze' }
+        { _id: '1', name: 'Acme Corp', tier: 'Gold', email: 'acme@example.com' },
+        { _id: '2', name: 'Beta Industries', tier: 'Silver', email: 'beta@example.com' },
+        { _id: '3', name: 'Gamma Solutions', tier: 'Bronze', email: 'gamma@example.com' },
       ]);
     }
   };
@@ -125,23 +144,29 @@ const QuotationPage = () => {
   const calculateTotals = () => {
     let subtotal = 0;
     let totalDiscount = 0;
-    
+    let totalTax = 0;
+
     cart.forEach(item => {
       const price = item.product.basePrice;
       const quantity = item.quantity;
       const discount = item.discountPercent;
+      const taxRate = item.product.taxRate || 0;
       const lineTotal = price * quantity;
       const lineDiscount = lineTotal * (discount / 100);
-      
+      const lineTax = (lineTotal - lineDiscount) * (taxRate / 100);
+
       subtotal += lineTotal;
       totalDiscount += lineDiscount;
+      totalTax += lineTax;
     });
-    
+
     return {
       subtotal,
       totalDiscount,
-      total: subtotal - totalDiscount,
-      margin: cart.length > 0 ? 30 - (totalDiscount / subtotal * 100) : 0
+      totalTax,
+      total: subtotal - totalDiscount + totalTax,
+      margin: cart.length > 0 ? 30 - (totalDiscount / subtotal * 100) : 0,
+      itemCount: cart.reduce((sum, item) => sum + item.quantity, 0)
     };
   };
 
@@ -152,7 +177,7 @@ const QuotationPage = () => {
       toast.error('Please select a customer');
       return;
     }
-    
+
     if (cart.length === 0) {
       toast.error('Please add items to quotation');
       return;
@@ -171,15 +196,15 @@ const QuotationPage = () => {
       });
 
       const data = response.data.data;
-      setQuoteId(data.quotation._id);
-      setQuotationStatus(data.quotation.approvalStatus);
-      setApprovalStatus(data.quotation.approvalChain);
-      setRiskScore(data.quotation.blendedRiskScore);
-      
-      toast.success('Quotation created successfully!');
-      
+      setQuoteId(data._id);
+      setQuotationStatus(data.approvalStatus);
+      setApprovalStatus(data.approvalChain);
+      setRiskScore(data.blendedRiskScore);
+
+      toast.success('Quotation created successfully! 🎉');
+
       // Show warehouse split if approved
-      if (data.quotation.approvalStatus === 'approved') {
+      if (data.approvalStatus === 'approved') {
         setShowWarehouseSplit(true);
       }
     } catch (error) {
@@ -189,18 +214,28 @@ const QuotationPage = () => {
     }
   };
 
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f5f7fa' }}>
       <Navbar />
-      
+
       <Box sx={{ flex: 1, p: 3 }}>
+        <Typography variant="h4" fontWeight="bold" gutterBottom>
+          Quotation Builder
+        </Typography>
+
         <Grid container spacing={3}>
-          {/* Left Column - Products & Cart */}
-          <Grid item xs={12} md={8}>
+          {/* Left Column - Products */}
+          <Grid item xs={12} lg={7}>
             {/* Customer Selection */}
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 2 }}>
               <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={12} md={6}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Select Customer</InputLabel>
                     <Select
@@ -216,36 +251,81 @@ const QuotationPage = () => {
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={12} md={6}>
                   {selectedCustomer && (
-                    <Chip 
-                      label={`Tier: ${customers.find(c => c._id === selectedCustomer)?.tier || 'N/A'}`}
-                      color="primary"
-                      size="small"
-                    />
+                    <Box display="flex" gap={1}>
+                      <Chip
+                        label={`Tier: ${customers.find(c => c._id === selectedCustomer)?.tier || 'N/A'}`}
+                        color="primary"
+                        size="small"
+                      />
+                      <Chip
+                        label="Max Discount: 15%"
+                        color="info"
+                        size="small"
+                        variant="outlined"
+                      />
+                    </Box>
                   )}
                 </Grid>
               </Grid>
             </Paper>
 
+            {/* Product Search & Filter */}
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Search products..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Category</InputLabel>
+                    <Select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      label="Category"
+                    >
+                      <MenuItem value="all">All Categories</MenuItem>
+                      <MenuItem value="Hardware">Hardware</MenuItem>
+                      <MenuItem value="Software">Software</MenuItem>
+                      <MenuItem value="Service">Service</MenuItem>
+                      <MenuItem value="Subscription">Subscription</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </Paper>
+
             {/* Products Grid */}
-            <Typography variant="h6" gutterBottom>
-              Products
-            </Typography>
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              {products.map(product => (
+            <Grid container spacing={2}>
+              {filteredProducts.map(product => (
                 <Grid item xs={12} sm={6} md={4} key={product._id}>
-                  <Card sx={{ 
-                    height: '100%', 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    position: 'relative',
-                    transition: 'transform 0.2s',
-                    '&:hover': { transform: 'scale(1.02)' }
-                  }}>
+                  <Card
+                    sx={{
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      position: 'relative',
+                      borderRadius: 2,
+                      transition: 'transform 0.2s, box-shadow 0.2s',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: 4
+                      }
+                    }}
+                  >
                     <CardContent sx={{ flexGrow: 1 }}>
                       {product.isPromoted && (
-                        <Chip 
+                        <Chip
                           label="🔥 Promoted"
                           size="small"
                           color="error"
@@ -255,9 +335,13 @@ const QuotationPage = () => {
                       <Typography variant="h6" gutterBottom>
                         {product.name}
                       </Typography>
-                      <Typography variant="body2" color="textSecondary" gutterBottom>
-                        {product.category}
-                      </Typography>
+                      <Chip
+                        label={product.category}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        sx={{ mb: 1 }}
+                      />
                       <Typography variant="h5" color="primary" gutterBottom>
                         ₹{product.basePrice.toLocaleString()}
                       </Typography>
@@ -271,6 +355,7 @@ const QuotationPage = () => {
                           startIcon={<Add />}
                           onClick={() => addToCart(product)}
                           fullWidth
+                          disabled={product.stock === 0}
                         >
                           Add to Cart
                         </Button>
@@ -282,70 +367,95 @@ const QuotationPage = () => {
             </Grid>
           </Grid>
 
-          {/* Right Column - Cart & Actions */}
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 2, position: 'sticky', top: 80 }}>
-              <Typography variant="h6" gutterBottom>
-                <ShoppingCart sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Cart ({cart.length} items)
-              </Typography>
-              <Divider sx={{ my: 1 }} />
+          {/* Right Column - Cart */}
+          <Grid item xs={12} lg={5}>
+            <Paper sx={{ p: 2, borderRadius: 2, position: 'sticky', top: 80 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6">
+                  <ShoppingCart sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)} items)
+                </Typography>
+                {cart.length > 0 && (
+                  <Button size="small" color="error" onClick={() => setCart([])}>
+                    Clear All
+                  </Button>
+                )}
+              </Box>
+              <Divider sx={{ mb: 2 }} />
 
               {/* Cart Items */}
               {cart.length === 0 ? (
                 <Box textAlign="center" py={4}>
+                  <ShoppingCart sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
                   <Typography variant="body2" color="textSecondary">
                     No items in cart
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary">
+                    Add products from the list
                   </Typography>
                 </Box>
               ) : (
                 <>
-                  {cart.map((item, index) => (
-                    <Box key={index} sx={{ mb: 2, p: 1, bgcolor: '#f8fafc', borderRadius: 1 }}>
-                      <Box display="flex" justifyContent="space-between" alignItems="start">
-                        <Box flex={1}>
-                          <Typography variant="body2" fontWeight="bold">
-                            {item.product.name}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            ₹{item.product.basePrice.toLocaleString()} × {item.quantity}
-                          </Typography>
+                  <Box sx={{ maxHeight: 400, overflow: 'auto', mb: 2 }}>
+                    {cart.map((item, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          mb: 1.5,
+                          p: 1.5,
+                          bgcolor: '#f8fafc',
+                          borderRadius: 1,
+                          border: '1px solid #e2e8f0'
+                        }}
+                      >
+                        <Box display="flex" justifyContent="space-between" alignItems="start">
+                          <Box flex={1}>
+                            <Typography variant="body2" fontWeight="bold">
+                              {item.product.name}
+                            </Typography>
+                            <Typography variant="caption" color="textSecondary">
+                              ₹{item.product.basePrice.toLocaleString()} × {item.quantity}
+                            </Typography>
+                          </Box>
+                          <IconButton size="small" onClick={() => removeFromCart(item.product._id)}>
+                            <Delete fontSize="small" color="error" />
+                          </IconButton>
                         </Box>
-                        <IconButton size="small" onClick={() => removeFromCart(item.product._id)}>
-                          <Delete fontSize="small" color="error" />
-                        </IconButton>
+
+                        <Box display="flex" alignItems="center" gap={1} mt={1}>
+                          <IconButton
+                            size="small"
+                            onClick={() => updateQuantity(item.product._id, -1)}
+                            disabled={item.quantity <= 1}
+                          >
+                            <Remove fontSize="small" />
+                          </IconButton>
+                          <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>
+                            {item.quantity}
+                          </Typography>
+                          <IconButton size="small" onClick={() => updateQuantity(item.product._id, 1)}>
+                            <Add fontSize="small" />
+                          </IconButton>
+
+                          <TextField
+                            size="small"
+                            type="number"
+                            value={item.discountPercent}
+                            onChange={(e) => updateDiscount(item.product._id, Number(e.target.value))}
+                            InputProps={{
+                              endAdornment: <Typography variant="caption">%</Typography>,
+                              sx: { width: 80 }
+                            }}
+                            sx={{ ml: 'auto' }}
+                          />
+                        </Box>
                       </Box>
-                      
-                      <Box display="flex" alignItems="center" gap={1} mt={1}>
-                        <IconButton 
-                          size="small" 
-                          onClick={() => updateQuantity(item.product._id, -1)}
-                          disabled={item.quantity <= 1}
-                        >
-                          <Remove fontSize="small" />
-                        </IconButton>
-                        <Typography variant="body2">{item.quantity}</Typography>
-                        <IconButton size="small" onClick={() => updateQuantity(item.product._id, 1)}>
-                          <Add fontSize="small" />
-                        </IconButton>
-                        
-                        <TextField
-                          size="small"
-                          type="number"
-                          value={item.discountPercent}
-                          onChange={(e) => updateDiscount(item.product._id, Number(e.target.value))}
-                          InputProps={{
-                            endAdornment: <Typography variant="caption">%</Typography>
-                          }}
-                          sx={{ width: 80, ml: 'auto' }}
-                        />
-                      </Box>
-                    </Box>
-                  ))}
+                    ))}
+                  </Box>
                 </>
               )}
 
-              <Divider sx={{ my: 1 }} />
+              <Divider sx={{ my: 2 }} />
 
               {/* Totals */}
               <Box>
@@ -357,32 +467,43 @@ const QuotationPage = () => {
                   <Typography variant="body2" color="error">Discount</Typography>
                   <Typography variant="body2" color="error">-₹{totals.totalDiscount.toLocaleString()}</Typography>
                 </Box>
-                <Box display="flex" justifyContent="space-between" py={1} borderTop="1px solid #e0e0e0">
+                <Box display="flex" justifyContent="space-between" py={0.5}>
+                  <Typography variant="body2">Tax</Typography>
+                  <Typography variant="body2">₹{totals.totalTax.toLocaleString()}</Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between" py={1} borderTop="2px solid #e0e0e0">
                   <Typography variant="h6">Total</Typography>
-                  <Typography variant="h6">₹{totals.total.toLocaleString()}</Typography>
+                  <Typography variant="h6" color="primary">
+                    ₹{totals.total.toLocaleString()}
+                  </Typography>
                 </Box>
                 <Box display="flex" justifyContent="space-between" py={0.5}>
                   <Typography variant="caption" color="textSecondary">Margin Impact</Typography>
-                  <Typography variant="caption" color={totals.margin > 20 ? 'success' : 'error'}>
-                    {totals.margin.toFixed(1)}% margin
-                  </Typography>
+                  <Chip
+                    label={`${totals.margin.toFixed(1)}% margin`}
+                    size="small"
+                    color={totals.margin > 20 ? 'success' : 'error'}
+                  />
                 </Box>
               </Box>
 
-              {/* Upsell Panel */}
-              {showUpsell && cart.length > 0 && (
-                <UpsellPanel cart={cart} onAdd={addToCart} />
-              )}
-
               {/* Risk Score Display */}
               {riskScore && (
-                <Alert severity={riskScore.needsManagerApproval ? 'warning' : 'success'} sx={{ mt: 1 }}>
+                <Alert
+                  severity={riskScore.needsManagerApproval ? 'warning' : 'success'}
+                  sx={{ mt: 2 }}
+                >
                   <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Typography variant="body2">
-                      Risk Score: {riskScore.score}
-                    </Typography>
-                    <Chip 
-                      label={riskScore.needsManagerApproval ? 'Approval Needed' : 'Auto-Approved'}
+                    <Box>
+                      <Typography variant="body2" fontWeight="bold">
+                        Risk Score: {riskScore.score}
+                      </Typography>
+                      <Typography variant="caption">
+                        Max Violation: {riskScore.maxViolation}% | Total: {riskScore.totalViolation}%
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label={riskScore.needsManagerApproval ? '⚠️ Approval Needed' : '✅ Auto-Approved'}
                       size="small"
                       color={riskScore.needsManagerApproval ? 'warning' : 'success'}
                     />
@@ -397,18 +518,19 @@ const QuotationPage = () => {
                   fullWidth
                   disabled={cart.length === 0 || loading}
                   onClick={createQuotation}
-                  sx={{ py: 1.5 }}
+                  sx={{ py: 1.5, borderRadius: 2 }}
                 >
                   {loading ? 'Creating...' : 'Create Quotation'}
                 </Button>
+
                 {quotationStatus !== 'draft' && (
                   <Button
                     variant="outlined"
                     fullWidth
                     sx={{ mt: 1 }}
-                    onClick={() => window.location.href = `/quotation/${quoteId}`}
+                    onClick={() => window.location.href = `/quotations/${quoteId}`}
                   >
-                    View Quotation
+                    View Quotation Details
                   </Button>
                 )}
               </Box>
@@ -417,13 +539,31 @@ const QuotationPage = () => {
         </Grid>
 
         {/* Warehouse Split Dialog */}
-        {showWarehouseSplit && (
-          <WarehouseSplit 
-            open={showWarehouseSplit}
-            onClose={() => setShowWarehouseSplit(false)}
-            quoteId={quoteId}
-          />
-        )}
+        <Dialog
+          open={showWarehouseSplit}
+          onClose={() => setShowWarehouseSplit(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            Warehouse Split
+            <IconButton
+              onClick={() => setShowWarehouseSplit(false)}
+              sx={{ position: 'absolute', right: 8, top: 8 }}
+            >
+              <Close />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent>
+            <WarehouseSplit quoteId={quoteId} />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowWarehouseSplit(false)}>Close</Button>
+            <Button variant="contained" onClick={() => setShowWarehouseSplit(false)}>
+              Confirm Split
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </Box>
   );

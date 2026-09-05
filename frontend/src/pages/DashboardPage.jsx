@@ -1,58 +1,41 @@
-// VAIBHAV - Dashboard Page
+// frontend/src/pages/DashboardPage.jsx
 import React, { useState, useEffect } from 'react';
-import {
+import { 
+  Grid, 
+  Paper, 
+  Typography, 
   Box,
-  Grid,
-  Paper,
-  Typography,
   Card,
   CardContent,
   IconButton,
   Chip,
-  Avatar,
-  LinearProgress,
-  Button,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
-  ListItemIcon
+  Avatar
 } from '@mui/material';
-import {
-  TrendingUp,
-  TrendingDown,
-  AttachMoney,
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  AttachMoney, 
   ShoppingCart,
   Warning,
   CheckCircle,
   Schedule,
   Refresh,
-  People,
-  Store,
-  Assessment,
-  Speed
+  People
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/common/Navbar';
-import StatsCard from '../components/dashboard/StatsCard';
-import DealHealthCard from '../components/dashboard/DealHealthCard';
 
 const DashboardPage = () => {
   const { user } = useAuth();
-  const { isConnected } = useSocket();
   const [stats, setStats] = useState({
     totalQuotes: 0,
     pendingApprovals: 0,
     activeDeals: 0,
     revenue: 0,
-    approvalRate: 0,
     stalledDeals: [],
-    anomalies: [],
-    recentActivity: []
+    anomalies: []
   });
   const [loading, setLoading] = useState(true);
 
@@ -72,8 +55,8 @@ const DashboardPage = () => {
     }
   };
 
-  const StatCard = ({ title, value, icon, color, subtitle, trend }) => (
-    <Card sx={{ height: '100%', position: 'relative', borderRadius: 2 }}>
+  const StatCard = ({ title, value, icon, color, subtitle }) => (
+    <Card sx={{ height: '100%', position: 'relative' }}>
       <CardContent>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Box>
@@ -88,17 +71,8 @@ const DashboardPage = () => {
                 {subtitle}
               </Typography>
             )}
-            {trend && (
-              <Chip
-                size="small"
-                label={trend}
-                icon={trend.includes('+') ? <TrendingUp /> : <TrendingDown />}
-                color={trend.includes('+') ? 'success' : 'error'}
-                sx={{ mt: 0.5 }}
-              />
-            )}
           </Box>
-          <Avatar sx={{ bgcolor: color, width: 48, height: 48 }}>
+          <Avatar sx={{ bgcolor: color }}>
             {icon}
           </Avatar>
         </Box>
@@ -107,30 +81,23 @@ const DashboardPage = () => {
   );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f5f7fa' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
       <Navbar />
-
+      
       <Box sx={{ flex: 1, p: 3 }}>
         {/* Header */}
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Box>
             <Typography variant="h4" fontWeight="bold">
-              Welcome back, {user?.name}! 👋
+              Welcome back, {user?.name}!
             </Typography>
             <Typography variant="body2" color="textSecondary">
               Here's what's happening with your deals today
             </Typography>
           </Box>
-          <Box display="flex" alignItems="center" gap={2}>
-            <Chip
-              label={isConnected ? '🟢 Live' : '🔴 Offline'}
-              size="small"
-              color={isConnected ? 'success' : 'error'}
-            />
-            <IconButton onClick={fetchDashboardData} color="primary">
-              <Refresh />
-            </IconButton>
-          </Box>
+          <IconButton onClick={fetchDashboardData} color="primary">
+            <Refresh />
+          </IconButton>
         </Box>
 
         {/* Stats Grid */}
@@ -141,7 +108,6 @@ const DashboardPage = () => {
               value={stats.activeDeals}
               icon={<ShoppingCart />}
               color="#1976d2"
-              subtitle="Total active quotations"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -155,22 +121,19 @@ const DashboardPage = () => {
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
-              title="Revenue"
+              title="Total Revenue"
               value={`₹${(stats.revenue / 100000).toFixed(1)}L`}
               icon={<AttachMoney />}
               color="#2e7d32"
               subtitle="This month"
-              trend="+12.5%"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
-              title="Approval Rate"
-              value={`${stats.approvalRate || 0}%`}
-              icon={<CheckCircle />}
+              title="Total Quotations"
+              value={stats.totalQuotes}
+              icon={<TrendingUp />}
               color="#9c27b0"
-              subtitle="Last 30 days"
-              trend="+5.2%"
             />
           </Grid>
         </Grid>
@@ -179,20 +142,12 @@ const DashboardPage = () => {
         <Grid container spacing={3}>
           {stats.stalledDeals?.length > 0 && (
             <Grid item xs={12} md={6}>
-              <Paper sx={{ p: 2, borderRadius: 2 }}>
+              <Paper sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>
-                  ⚠️ Stalled Deals ({stats.stalledDeals.length})
+                  ⚠️ Stalled Deals
                 </Typography>
                 {stats.stalledDeals.map((deal, idx) => (
-                  <Box
-                    key={idx}
-                    display="flex"
-                    alignItems="center"
-                    p={1.5}
-                    bgcolor="#fff3e0"
-                    borderRadius={1}
-                    mb={1}
-                  >
+                  <Box key={idx} display="flex" alignItems="center" p={1} bgcolor="#fff3e0" borderRadius={1} mb={1}>
                     <Warning sx={{ color: '#ed6c02', mr: 1 }} />
                     <Box flex={1}>
                       <Typography variant="body2" fontWeight="bold">
@@ -211,20 +166,12 @@ const DashboardPage = () => {
 
           {stats.anomalies?.length > 0 && (
             <Grid item xs={12} md={6}>
-              <Paper sx={{ p: 2, borderRadius: 2 }}>
+              <Paper sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>
-                  🚨 Discount Anomalies ({stats.anomalies.length})
+                  🚨 Discount Anomalies
                 </Typography>
                 {stats.anomalies.map((anomaly, idx) => (
-                  <Box
-                    key={idx}
-                    display="flex"
-                    alignItems="center"
-                    p={1.5}
-                    bgcolor="#ffebee"
-                    borderRadius={1}
-                    mb={1}
-                  >
+                  <Box key={idx} display="flex" alignItems="center" p={1} bgcolor="#ffebee" borderRadius={1} mb={1}>
                     <TrendingDown sx={{ color: '#d32f2f', mr: 1 }} />
                     <Box flex={1}>
                       <Typography variant="body2" fontWeight="bold">
@@ -242,68 +189,32 @@ const DashboardPage = () => {
           )}
         </Grid>
 
-        {/* Recent Activity */}
-        <Paper sx={{ p: 2, mt: 3, borderRadius: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            📋 Recent Activity
-          </Typography>
-          <Divider sx={{ mb: 2 }} />
-          {stats.recentActivity?.length > 0 ? (
-            <List>
-              {stats.recentActivity.map((activity, idx) => (
-                <ListItem key={idx} divider={idx < stats.recentActivity.length - 1}>
-                  <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: activity.color || '#1976d2' }}>
-                      {activity.icon || <Store />}
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={activity.message}
-                    secondary={activity.timestamp}
-                  />
-                  <Chip
-                    label={activity.status}
-                    size="small"
-                    color={activity.statusColor || 'default'}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          ) : (
-            <Box textAlign="center" py={4}>
-              <Typography variant="body2" color="textSecondary">
-                No recent activity
-              </Typography>
-            </Box>
-          )}
-        </Paper>
-
         {/* Quick Actions */}
-        <Box mt={3} display="flex" gap={2} flexWrap="wrap">
-          <Button
-            variant="contained"
-            startIcon={<ShoppingCart />}
-            onClick={() => window.location.href = '/quotations'}
-          >
-            New Quotation
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<Assessment />}
-            onClick={() => window.location.href = '/reports'}
-          >
-            View Reports
-          </Button>
-          {user?.role === 'admin' && (
-            <Button
-              variant="outlined"
-              startIcon={<Settings />}
-              onClick={() => window.location.href = '/admin'}
-            >
-              Admin Panel
-            </Button>
-          )}
-        </Box>
+        <Grid container spacing={2} mt={2}>
+          <Grid item xs={12}>
+            <Box display="flex" gap={2} flexWrap="wrap">
+              <Chip 
+                icon={<ShoppingCart />} 
+                label="New Quotation" 
+                color="primary"
+                onClick={() => window.location.href = '/quotations'}
+                sx={{ fontSize: '1rem', p: 2 }}
+              />
+              <Chip 
+                icon={<People />} 
+                label="Pending Approvals" 
+                color="warning"
+                sx={{ fontSize: '1rem', p: 2 }}
+              />
+              <Chip 
+                icon={<CheckCircle />} 
+                label="My Deals" 
+                color="success"
+                sx={{ fontSize: '1rem', p: 2 }}
+              />
+            </Box>
+          </Grid>
+        </Grid>
       </Box>
     </Box>
   );

@@ -1,20 +1,19 @@
+// frontend/src/pages/LoginPage.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import {
-  Container,
-  Box,
-  Typography,
-  TextField,
-  Button,
+import { 
+  Container, 
+  Box, 
+  Typography, 
+  TextField, 
+  Button, 
   Paper,
   InputAdornment,
   IconButton,
-  Alert,
-  Divider,
-  Chip
+  Alert
 } from '@mui/material';
-import { Visibility, VisibilityOff, Email, Lock, Store } from '@mui/icons-material';
+import { Visibility, VisibilityOff, Email, Lock } from '@mui/icons-material';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -36,17 +35,9 @@ const LoginPage = () => {
     if (result.success) {
       navigate('/dashboard');
     } else {
-      setError(result.error || 'Login failed. Please try again.');
+      setError(result.error);
     }
   };
-
-  const demoAccounts = [
-    { role: 'Sales Rep', email: 'ayush@dealflow.com', password: 'Test@123', color: '#1976d2' },
-    { role: 'Sales Manager', email: 'manager@dealflow.com', password: 'Test@123', color: '#ed6c02' },
-    { role: 'Finance', email: 'finance@dealflow.com', password: 'Test@123', color: '#2e7d32' },
-    { role: 'Admin', email: 'admin@dealflow.com', password: 'Test@123', color: '#9c27b0' },
-    { role: 'Customer', email: 'acme@dealflow.com', password: 'Test@123', color: '#0d9488' },
-  ];
 
   return (
     <Container component="main" maxWidth="xs">
@@ -57,7 +48,6 @@ const LoginPage = () => {
           flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          py: 4
         }}
       >
         <Paper
@@ -65,13 +55,11 @@ const LoginPage = () => {
           sx={{
             padding: 4,
             width: '100%',
-            borderRadius: 3,
+            borderRadius: 2,
             background: 'white'
           }}
         >
-          {/* Logo */}
           <Box textAlign="center" mb={3}>
-            <Store sx={{ fontSize: 48, color: '#1976d2', mb: 1 }} />
             <Typography variant="h4" fontWeight="bold" color="primary">
               DealFlow360
             </Typography>
@@ -135,49 +123,26 @@ const LoginPage = () => {
               variant="contained"
               size="large"
               disabled={loading}
-              sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: 2 }}
+              sx={{ mt: 3, mb: 2, py: 1.5 }}
             >
               {loading ? 'Logging in...' : 'Login'}
             </Button>
 
-            <Divider sx={{ my: 2 }}>
-              <Chip label="Demo Accounts" size="small" />
-            </Divider>
-
-            <Box>
-              <Typography variant="caption" color="textSecondary" display="block" mb={1}>
-                Click on any demo account to login instantly:
+            <Box textAlign="center" mt={2}>
+              <Typography variant="body2" color="textSecondary">
+                Demo Accounts:
               </Typography>
-              <Box display="flex" flexWrap="wrap" gap={1}>
-                {demoAccounts.map((demo, idx) => (
-                  <Chip
-                    key={idx}
-                    label={demo.role}
-                    size="small"
-                    onClick={() => {
-                      setEmail(demo.email);
-                      setPassword(demo.password);
-                    }}
-                    sx={{
-                      bgcolor: demo.color + '20',
-                      color: demo.color,
-                      border: `1px solid ${demo.color}40`,
-                      '&:hover': {
-                        bgcolor: demo.color + '40',
-                      },
-                      cursor: 'pointer'
-                    }}
-                  />
-                ))}
-              </Box>
+              <Typography variant="caption" display="block">
+                Sales Rep: ayush@dealflow.com / Test@123
+              </Typography>
+              <Typography variant="caption" display="block">
+                Manager: manager@dealflow.com / Test@123
+              </Typography>
+              <Typography variant="caption" display="block">
+                Admin: admin@dealflow.com / Test@123
+              </Typography>
             </Box>
           </form>
-
-          <Box mt={2} textAlign="center">
-            <Typography variant="caption" color="textSecondary">
-              DealFlow360 v1.0 • Odoo Hackathon 2026
-            </Typography>
-          </Box>
         </Paper>
       </Box>
     </Container>

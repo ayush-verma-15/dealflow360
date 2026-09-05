@@ -1,3 +1,4 @@
+// frontend/src/context/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -41,13 +42,13 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.post('/api/auth/login', { email, password });
       const { token, user } = response.data.data;
-
+      
       localStorage.setItem('token', token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setToken(token);
       setUser(user);
-
-      toast.success(`Welcome back, ${user.name}! 🎉`);
+      
+      toast.success('Welcome back! 🎉');
       return { success: true };
     } catch (error) {
       toast.error(error.response?.data?.message || 'Login failed');
@@ -85,8 +86,7 @@ export const AuthProvider = ({ children }) => {
     isAdmin: user?.role === 'admin',
     isManager: user?.role === 'sales_manager',
     isSalesRep: user?.role === 'sales_rep',
-    isFinance: user?.role === 'finance',
-    isCustomer: user?.role === 'customer'
+    isFinance: user?.role === 'finance'
   };
 
   return (

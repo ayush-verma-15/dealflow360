@@ -1,22 +1,33 @@
-// How it works:
-// 1. Sort warehouses by shipping cost (cheapest first)
-// 2. For each item, fulfill from warehouses with stock
-// 3. Minimize number of shipments
-// 4. Create backorders for unavailable items
+// NISHANK - Warehouse Routes
+const express = require('express');
+const router = express.Router();
+const { protect, authorize } = require('../middleware/auth');
+const {
+  getWarehouses,
+  getWarehouse,
+  createWarehouse,
+  updateWarehouse,
+  deleteWarehouse,
+  updateStock,
+  getWarehouseSplit,
+  getProductStock
+} = require('../controllers/warehouseController');
 
-function optimizeWarehouseSplit(orderItems, warehouses) {
-  // Example: 100 Laptops, 50 Servers
-  // Mumbai: 60 Laptops (shipping cost: 1.2)
-  // Delhi: 40 Laptops, 30 Servers (shipping cost: 1.4)
-  // Bangalore: 20 Servers (shipping cost: 1.6)
-  
-  return {
-    split: [
-      { warehouse: "Mumbai", items: [{ product: "Laptop", qty: 60 }] },
-      { warehouse: "Delhi", items: [{ product: "Laptop", qty: 40 }, { product: "Server", qty: 30 }] }
-    ],
-    backorders: [{ product: "Server", qty: 20 }],
-    totalShipments: 2,
-    totalShippingCost: 2600
-  };
-}
+// All routes are protected
+router.use(protect);
+
+// Public (authenticated) routes
+router.get('/', getWarehouses);
+router.get('/:id', getWarehouse);
+router.post('/split', getWarehouseSplit);
+router.get('/product/:productId/stock', getProductStock);
+
+// Admin only routes
+router.post('/', authorize('admin'), createWarehouse);
+router.put('/:id', authorize('admin'), updateWarehouse);
+router.delete('/:id', authorize('admin'), deleteWarehouse);
+
+// Stock management
+router.patch('/:id/stock', updateStock);
+
+module.exports = router;

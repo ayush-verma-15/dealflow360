@@ -1,4 +1,3 @@
-// AYUSH - Authentication Controller
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
@@ -9,9 +8,7 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Register user
-// @route   POST /api/auth/register
-// @access  Public
+
 exports.register = async (req, res) => {
   try {
     // Check validation

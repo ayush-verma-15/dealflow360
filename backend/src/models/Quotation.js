@@ -1,4 +1,3 @@
-// AYUSH - Quotation Model
 const mongoose = require('mongoose');
 
 const quotationSchema = new mongoose.Schema({

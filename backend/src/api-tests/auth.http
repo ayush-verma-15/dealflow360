@@ -1,0 +1,19 @@
+### Register
+POST http://localhost:5000/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Ayush",
+  "email": "ayush@test.com",
+  "password": "Test@123",
+  "role": "sales_rep"
+}
+
+### Login
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "ayush@test.com",
+  "password": "Test@123"
+}

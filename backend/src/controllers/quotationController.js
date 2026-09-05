@@ -1,4 +1,4 @@
-// AYUSH - Quotation Controller
+
 const Quotation = require('../models/Quotation');
 const Product = require('../models/Product');
 const User = require('../models/User');

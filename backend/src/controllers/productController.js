@@ -1,6 +1,7 @@
 // NISHANK - Product Controller
 const Product = require('../models/Product');
 const mongoose = require('mongoose');
+const UpsellRule = require('../models/UpsellRule');
 
 // @desc    Get all products
 // @route   GET /api/products
@@ -261,7 +262,26 @@ exports.getRecommendations = async (req, res) => {
       });
     }
 
-    // Get co-purchase history
+    const rules = await UpsellRule.find({ sourceProduct: { $in: productIds }, active: true })
+      .populate('suggestedProduct')
+      .sort({ priority: -1 });
+
+    const recommendations = new Map();
+    for (const rule of rules) {
+      const product = rule.suggestedProduct;
+      if (product?.isActive && !productIds.includes(product._id.toString())) {
+        const margin = Number(product.margin || 0);
+        if (margin >= rule.marginThreshold) recommendations.set(product._id.toString(), {
+          product,
+          reason: rule.reason,
+          promotion: rule.promotion,
+          score: 100 + rule.priority,
+          marginDelta: margin
+        });
+      }
+    }
+
+    // Add co-purchase history as a ranking signal when no explicit rule exists.
     const products = await Product.find({
       _id: { $in: productIds }
     });
@@ -293,11 +313,15 @@ exports.getRecommendations = async (req, res) => {
     // Sort by recommendation order
     const ordered = sorted
       .map(id => recommendedProducts.find(p => p._id.toString() === id))
-      .filter(p => p);
+      .filter(p => p)
+      .filter((product) => !recommendations.has(product._id.toString()))
+      .map((product) => ({ product, reason: 'Frequently purchased together', promotion: product.isPromoted ? 'Active promotion' : '', score: recommendationsMap.get(product._id.toString()), marginDelta: product.margin || 0 }));
+
+    const data = [...recommendations.values(), ...ordered].slice(0, Number(limit));
 
     res.status(200).json({
       success: true,
-      data: ordered
+      data
     });
   } catch (error) {
     console.error('Get recommendations error:', error);
@@ -306,4 +330,24 @@ exports.getRecommendations = async (req, res) => {
       message: 'Server error'
     });
   }
+};
+
+exports.createUpsellRule = async (req, res) => {
+  try {
+    const rule = await UpsellRule.create(req.body);
+    res.status(201).json({ success: true, data: rule });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Unable to create upsell rule' });
+  }
+};
+
+exports.getUpsellRules = async (req, res) => {
+  const rules = await UpsellRule.find().populate('sourceProduct suggestedProduct').sort({ priority: -1 });
+  res.json({ success: true, count: rules.length, data: rules });
+};
+
+exports.deleteUpsellRule = async (req, res) => {
+  const rule = await UpsellRule.findByIdAndDelete(req.params.id);
+  if (!rule) return res.status(404).json({ success: false, message: 'Upsell rule not found' });
+  res.json({ success: true, message: 'Upsell rule deleted' });
 };

@@ -31,7 +31,7 @@ exports.getStats = async (req, res) => {
 			.map((line) => ({
 				quoteId: quote._id,
 				repName: quote.salesRep?.name || 'Sales rep',
-				avgDiscount: 10,
+				avgDiscount: quotations.filter((item) => item.salesRep?._id?.toString() === quote.salesRep?._id?.toString()).reduce((sum, item) => sum + (item.subtotal ? (item.totalDiscount / item.subtotal) * 100 : 0), 0) / Math.max(1, quotations.filter((item) => item.salesRep?._id?.toString() === quote.salesRep?._id?.toString()).length),
 				currentDiscount: line.discountPercent
 			}))).slice(0, 8);
 

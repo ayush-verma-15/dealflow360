@@ -9,16 +9,22 @@ const {
   updateProduct,
   deleteProduct,
   updateStock,
-  getRecommendations
+  getRecommendations,
+  createUpsellRule,
+  getUpsellRules,
+  deleteUpsellRule
 } = require('../controllers/productController');
 
 // All routes are protected
-router.use(protect);
+router.use(protect, authorize('admin', 'sales_manager', 'sales_rep', 'finance', 'operations'));
 
 // Public (authenticated) routes
 router.get('/', getProducts);
-router.get('/:id', getProduct);
 router.post('/recommendations', getRecommendations);
+router.get('/upsell-rules', authorize('admin', 'sales_manager'), getUpsellRules);
+router.post('/upsell-rules', authorize('admin'), createUpsellRule);
+router.delete('/upsell-rules/:id', authorize('admin'), deleteUpsellRule);
+router.get('/:id', getProduct);
 
 // Admin only routes
 router.post('/', authorize('admin'), createProduct);

@@ -44,6 +44,7 @@ import {
   AttachMoney
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/common/Navbar';
@@ -52,6 +53,7 @@ import WarehouseSplit from '../components/warehouse/WarehouseSplit';
 
 const QuotationPage = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState('');
@@ -66,11 +68,51 @@ const QuotationPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [tabValue, setTabValue] = useState(0);
+  const [editingQuoteId, setEditingQuoteId] = useState(searchParams.get('edit'));
+  const [filteredQuotes, setFilteredQuotes] = useState([]);
+  const [filteredLoading, setFilteredLoading] = useState(false);
+  const [filteredError, setFilteredError] = useState('');
 
   useEffect(() => {
     fetchProducts();
     fetchCustomers();
   }, []);
+
+  useEffect(() => {
+    const quoteIdFromUrl = searchParams.get('edit');
+    if (!quoteIdFromUrl || !products.length || !customers.length) return;
+    setEditingQuoteId(quoteIdFromUrl);
+    axios.get(`/api/quotes/${quoteIdFromUrl}`).then(({ data }) => {
+      const quote = data.data;
+      setSelectedCustomer(quote.customer?._id || quote.customer);
+      setCart(quote.lines.map((line) => ({
+        product: typeof line.product === 'object' ? line.product : products.find((product) => product._id === line.product),
+        quantity: line.quantity,
+        discountPercent: line.discountPercent || 0
+      })).filter((item) => item.product));
+      setQuotationStatus(quote.approvalStatus || quote.status);
+      setQuoteId(quote._id);
+    }).catch((error) => toast.error(error.response?.data?.message || 'Unable to load quotation for editing'));
+  }, [products.length, customers.length, searchParams]);
+
+  useEffect(() => {
+    const statusFilter = searchParams.get('status');
+    const approvalFilter = searchParams.get('approvalStatus');
+    if (!statusFilter && !approvalFilter) return;
+    setFilteredLoading(true);
+    setFilteredError('');
+    axios.get('/api/quotes').then(({ data }) => {
+      const activeStatuses = ['draft', 'sent', 'confirmed', 'fulfilled', 'invoiced'];
+      setFilteredQuotes((data.data || []).filter((quote) => {
+        const statusMatch = statusFilter === 'active' ? activeStatuses.includes(quote.status) : (!statusFilter || quote.status === statusFilter);
+        return statusMatch && (!approvalFilter || quote.approvalStatus === approvalFilter || (approvalFilter === 'pending' && ['pending-manager', 'pending-finance'].includes(quote.approvalStatus)));
+      }));
+    }).catch((error) => {
+      const message = error.response?.data?.message || 'Unable to load filtered quotations';
+      setFilteredError(message);
+      toast.error(message);
+    }).finally(() => setFilteredLoading(false));
+  }, [searchParams]);
 
   const fetchProducts = async () => {
     try {
@@ -185,7 +227,7 @@ const QuotationPage = () => {
 
     setLoading(true);
     try {
-      const response = await axios.post('/api/quotes', {
+      const payload = {
         customer: selectedCustomer,
         lines: cart.map(item => ({
           productId: item.product._id,
@@ -193,7 +235,10 @@ const QuotationPage = () => {
           discountPercent: item.discountPercent,
           lineType: item.product.category === 'Subscription' ? 'subscription' : 'one-time'
         }))
-      });
+      };
+      const response = editingQuoteId
+        ? await axios.put(`/api/quotes/${editingQuoteId}`, payload)
+        : await axios.post('/api/quotes', payload);
 
       const data = response.data.data;
       setQuoteId(data._id);
@@ -201,7 +246,7 @@ const QuotationPage = () => {
       setApprovalStatus(data.approvalChain);
       setRiskScore(data.blendedRiskScore);
 
-      toast.success('Quotation created successfully! 🎉');
+      toast.success(editingQuoteId ? 'Quotation updated successfully' : 'Quotation created successfully! 🎉');
 
       // Show warehouse split if approved
       if (data.approvalStatus === 'approved') {
@@ -219,6 +264,12 @@ const QuotationPage = () => {
     const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
+
+  const isFilteredView = Boolean(searchParams.get('status') || searchParams.get('approvalStatus'));
+  if (isFilteredView) {
+    const title = searchParams.get('approvalStatus') ? 'Pending approvals' : 'Active deals';
+    return <Box className="quotation-page" sx={{ minHeight: '100vh' }}><Navbar /><Box className="quotation-content"><Typography className="page-eyebrow">Pipeline view</Typography><Typography className="page-title" component="h1">{title}</Typography><Typography className="page-description" sx={{ mb: 3 }}>Open a quotation to review its details and edit it when allowed.</Typography>{filteredLoading && <LinearProgress sx={{ mb: 2 }} />}{filteredError && <Alert severity="error" sx={{ mb: 2 }}>{filteredError}</Alert>}<Grid container spacing={2}>{filteredQuotes.map((quote) => <Grid item xs={12} md={6} lg={4} key={quote._id}><Card className="product-card"><CardContent><Stack direction="row" justifyContent="space-between" gap={1}><Typography variant="h6">{quote.quoteNumber}</Typography><Chip label={quote.status} size="small" variant="outlined" /></Stack><Typography color="text.secondary" sx={{ mt: 1 }}>{quote.customer?.name || 'Customer'}</Typography><Typography variant="h5" color="primary" sx={{ mt: 2 }}>₹{Number(quote.totalAmount || 0).toLocaleString()}</Typography><Typography variant="body2" sx={{ mt: 1 }}>Approval: {quote.approvalStatus}</Typography><Button fullWidth variant="contained" sx={{ mt: 2 }} onClick={() => { window.location.href = `/quotations/${quote._id}`; }}>Open quotation</Button></CardContent></Card></Grid>)}{!filteredLoading && !filteredError && filteredQuotes.length === 0 && <Grid item xs={12}><Paper className="surface-panel" sx={{ p: 4 }}><Typography color="text.secondary">No quotations match this dashboard view.</Typography></Paper></Grid>}</Grid></Box></Box>;
+  }
 
   return (
     <Box className="quotation-page" sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -457,7 +508,7 @@ const QuotationPage = () => {
 
               <Divider sx={{ my: 2 }} />
 
-              {showUpsell && <UpsellPanel />}
+              {showUpsell && <UpsellPanel productIds={cart.map((item) => item.product._id)} onAdd={addToCart} />}
 
               {/* Totals */}
               <Box>
@@ -522,7 +573,7 @@ const QuotationPage = () => {
                   onClick={createQuotation}
                   sx={{ py: 1.5, borderRadius: 2 }}
                 >
-                  {loading ? 'Creating...' : 'Create Quotation'}
+                  {loading ? (editingQuoteId ? 'Updating...' : 'Creating...') : (editingQuoteId ? 'Update Quotation' : 'Create Quotation')}
                 </Button>
 
                 {quotationStatus !== 'draft' && (

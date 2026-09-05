@@ -17,6 +17,28 @@ class BillingEngine {
       if (!quotation) {
         throw new Error('Quotation not found');
       }
+
+      const existingInvoice = await Invoice.findOne({ quotation: quotation._id });
+      const existingSubscriptions = await Subscription.find({ quotation: quotation._id });
+      if (existingInvoice || existingSubscriptions.length > 0) {
+        return {
+          quotationId: quotation._id,
+          oneTimeInvoice: existingInvoice,
+          subscriptionSchedule: existingSubscriptions.map((subscription) => ({
+            subscriptionId: subscription._id,
+            productName: subscription.planName,
+            frequency: subscription.frequency,
+            startDate: subscription.startDate,
+            nextBillingDate: subscription.nextBillingDate,
+            amount: subscription.amount,
+            status: subscription.status
+          })),
+          oneTimeTotal: existingInvoice?.totalAmount || 0,
+          subscriptionTotal: existingSubscriptions.reduce((sum, item) => sum + item.amount, 0),
+          totalAmount: (existingInvoice?.totalAmount || 0) + existingSubscriptions.reduce((sum, item) => sum + item.amount, 0),
+          nextBillingDate: existingSubscriptions[0]?.nextBillingDate || null
+        };
+      }
       
       // Separate one-time and subscription lines
       const oneTimeLines = quotation.lines.filter(l => l.lineType === 'one-time');

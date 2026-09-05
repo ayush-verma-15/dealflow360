@@ -2,8 +2,24 @@
 const Quotation = require('../models/Quotation');
 const Product = require('../models/Product');
 const User = require('../models/User');
+const Invoice = require('../models/Invoice');
+const Subscription = require('../models/Subscription');
 const calculateBlendedRiskScore = require('../utils/blendedRiskScore');
 const optimizeWarehouseSplit = require('../utils/warehouseSplit');
+const PDFDocument = require('pdfkit');
+
+const customerSafeQuotation = (quotation) => {
+  const safeQuotation = quotation.toObject ? quotation.toObject() : { ...quotation };
+  delete safeQuotation.approvalChain;
+  delete safeQuotation.blendedRiskScore;
+  delete safeQuotation.auditLog;
+  safeQuotation.lines = (safeQuotation.lines || []).map((line) => {
+    const safeLine = { ...line };
+    delete safeLine.marginImpact;
+    return safeLine;
+  });
+  return safeQuotation;
+};
 // @desc    Create quotation
 // @route   POST /api/quotes
 // @access  Private
@@ -49,6 +65,7 @@ exports.createQuotation = async (req, res) => {
         quantity: line.quantity,
         unitPrice: unitPrice,
         discountPercent: line.discountPercent || 0,
+        taxRate: product.taxRate || 0,
         lineType: lineType
       });
     }
@@ -95,6 +112,11 @@ exports.createQuotation = async (req, res) => {
 
     await quotation.save();
 
+    if (quotation.approvalStatus === 'approved') {
+      const BillingEngine = require('../utils/billingEngine');
+      await BillingEngine.generateBillingSchedule(quotation._id);
+    }
+
     // Populate quotation details
     const populatedQuotation = await Quotation.findById(quotation._id)
       .populate('customer', 'name email tier')
@@ -124,7 +146,9 @@ exports.getQuotations = async (req, res) => {
     let query = {};
     
     // Filter by role
-    if (req.user.role === 'sales_rep') {
+    if (req.user.role === 'customer') {
+      query.customer = req.user.id;
+    } else if (req.user.role === 'sales_rep') {
       query.salesRep = req.user.id;
     }
     
@@ -143,7 +167,7 @@ exports.getQuotations = async (req, res) => {
     res.status(200).json({
       success: true,
       count: quotations.length,
-      data: quotations
+      data: req.user.role === 'customer' ? quotations.map(customerSafeQuotation) : quotations
     });
   } catch (error) {
     console.error('Get quotations error:', error);
@@ -175,6 +199,10 @@ exports.getQuotation = async (req, res) => {
     }
 
     // Check access rights
+    if (req.user.role === 'customer' && quotation.customer._id.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to view this quotation' });
+    }
+
     if (req.user.role === 'sales_rep' && quotation.salesRep._id.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
@@ -184,7 +212,7 @@ exports.getQuotation = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: quotation
+      data: req.user.role === 'customer' ? customerSafeQuotation(quotation) : quotation
     });
   } catch (error) {
     console.error('Get quotation error:', error);
@@ -211,8 +239,8 @@ exports.updateQuotation = async (req, res) => {
       });
     }
 
-    // Check if quotation can be updated
-    if (quotation.status !== 'draft') {
+    // Paid and cancelled quotes are immutable; invoiced/confirmed quotes are recalculated on update.
+    if (['paid', 'cancelled'].includes(quotation.status)) {
       return res.status(400).json({
         success: false,
         message: 'Cannot update quotation after it has been sent'
@@ -220,6 +248,11 @@ exports.updateQuotation = async (req, res) => {
     }
 
     const { lines } = req.body;
+
+    await Invoice.deleteMany({ quotation: quotation._id });
+    await Subscription.deleteMany({ quotation: quotation._id });
+    quotation.invoice = undefined;
+    quotation.status = 'draft';
 
     if (lines) {
       const processedLines = [];
@@ -242,6 +275,7 @@ exports.updateQuotation = async (req, res) => {
           quantity: line.quantity,
           unitPrice: unitPrice,
           discountPercent: line.discountPercent || 0,
+          taxRate: product.taxRate || 0,
           lineType: lineType
         });
       }
@@ -270,6 +304,11 @@ exports.updateQuotation = async (req, res) => {
     });
 
     await quotation.save();
+
+    if (quotation.approvalStatus === 'approved') {
+      const BillingEngine = require('../utils/billingEngine');
+      await BillingEngine.generateBillingSchedule(quotation._id);
+    }
 
     const updatedQuotation = await Quotation.findById(req.params.id)
       .populate('customer', 'name email tier')
@@ -499,6 +538,29 @@ exports.rejectQuotation = async (req, res) => {
   }
 };
 
+exports.returnQuotationForRevision = async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason) return res.status(400).json({ success: false, message: 'Please provide a reason for revision' });
+    const quotation = await Quotation.findById(req.params.id);
+    if (!quotation) return res.status(404).json({ success: false, message: 'Quotation not found' });
+    const role = req.user.role === 'sales_manager' ? 'manager' : req.user.role === 'finance' ? 'finance' : null;
+    if (!role) return res.status(403).json({ success: false, message: 'Not authorized to return quotations' });
+    const step = quotation.approvalChain.find((item) => item.role === role && item.status === 'pending');
+    if (!step) return res.status(400).json({ success: false, message: 'No pending approval for this role' });
+    step.status = 'rejected';
+    step.userId = req.user.id;
+    step.reason = reason;
+    step.timestamp = new Date();
+    quotation.approvalStatus = 'returned-for-revision';
+    quotation.auditLog.push({ user: req.user.id, action: `Returned for revision (${role})`, reason });
+    await quotation.save();
+    res.status(200).json({ success: true, message: 'Quotation returned for revision', data: quotation });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Unable to return quotation for revision' });
+  }
+};
+
 // @desc    Delete quotation
 // @route   DELETE /api/quotes/:id
 // @access  Private
@@ -569,7 +631,43 @@ exports.getRiskScore = async (req, res) => {
 
 const canAccessQuotation = (quotation, user) => {
   if (['admin', 'sales_manager', 'finance'].includes(user.role)) return true;
-  return quotation.customer.toString() === user.id || quotation.salesRep.toString() === user.id;
+  const customerId = quotation.customer?._id || quotation.customer;
+  const salesRepId = quotation.salesRep?._id || quotation.salesRep;
+  return customerId?.toString() === user.id || salesRepId?.toString() === user.id;
+};
+
+exports.downloadQuotationPdf = async (req, res) => {
+  try {
+    const quotation = await Quotation.findById(req.params.id)
+      .populate('customer', 'name email company')
+      .populate('salesRep', 'name email');
+    if (!quotation) return res.status(404).json({ success: false, message: 'Quotation not found' });
+    if (!canAccessQuotation(quotation, req.user)) return res.status(403).json({ success: false, message: 'Not authorized to download this quotation' });
+
+    const filename = `${quotation.quoteNumber || 'quotation'}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    const pdf = new PDFDocument({ margin: 48 });
+    pdf.pipe(res);
+    pdf.fontSize(22).fillColor('#176b52').text('DealFlow360');
+    pdf.moveDown(0.5).fontSize(16).fillColor('#17231f').text(`Quotation ${quotation.quoteNumber}`);
+    pdf.fontSize(10).fillColor('#66736d').text(`Status: ${quotation.status} | Date: ${new Date(quotation.createdAt).toLocaleDateString('en-IN')}`);
+    pdf.moveDown().fillColor('#17231f').fontSize(11).text(`Customer: ${quotation.customer?.name || 'Customer'}`);
+    if (quotation.customer?.company) pdf.text(`Company: ${quotation.customer.company}`);
+    pdf.text(`Sales representative: ${quotation.salesRep?.name || 'Sales team'}`);
+    pdf.moveDown().fontSize(12).text('Items');
+    quotation.lines.forEach((line, index) => {
+      const amount = Number(line.total || 0).toLocaleString('en-IN');
+      pdf.fontSize(10).text(`${index + 1}. ${line.productName}  x${line.quantity}  | Unit: INR ${Number(line.unitPrice || 0).toLocaleString('en-IN')}  | Discount: ${line.discountPercent || 0}%  | Total: INR ${amount}`);
+    });
+    pdf.moveDown().fontSize(11).text(`Subtotal: INR ${Number(quotation.subtotal || 0).toLocaleString('en-IN')}`);
+    pdf.text(`Discount: INR ${Number(quotation.totalDiscount || 0).toLocaleString('en-IN')}`);
+    pdf.text(`Tax: INR ${Number(quotation.taxAmount || 0).toLocaleString('en-IN')}`);
+    pdf.fontSize(14).text(`Grand total: INR ${Number(quotation.totalAmount || 0).toLocaleString('en-IN')}`);
+    pdf.end();
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Unable to generate quotation PDF' });
+  }
 };
 
 exports.requestNegotiation = async (req, res) => {
@@ -578,6 +676,7 @@ exports.requestNegotiation = async (req, res) => {
     const quotation = await Quotation.findById(req.params.id);
     if (!quotation) return res.status(404).json({ success: false, message: 'Quotation not found' });
     if (!canAccessQuotation(quotation, req.user)) return res.status(403).json({ success: false, message: 'Not authorized to negotiate this quotation' });
+    if (req.user.role === 'customer' && !['sent', 'negotiation'].includes(quotation.status)) return res.status(400).json({ success: false, message: 'Quotation is not open for negotiation' });
     if (!message && requestedDiscount === undefined) return res.status(400).json({ success: false, message: 'Add a message or requested discount' });
 
     quotation.negotiation.status = 'pending';
@@ -587,7 +686,7 @@ exports.requestNegotiation = async (req, res) => {
     quotation.status = 'sent';
     quotation.auditLog.push({ user: req.user.id, action: 'Negotiation requested', reason: message || 'Discount requested' });
     await quotation.save();
-    res.status(200).json({ success: true, message: 'Negotiation request submitted', data: quotation });
+    res.status(200).json({ success: true, message: 'Negotiation request submitted', data: req.user.role === 'customer' ? customerSafeQuotation(quotation) : quotation });
   } catch (error) {
     console.error('Negotiation request error:', error);
     res.status(500).json({ success: false, message: 'Unable to submit negotiation request' });
@@ -599,6 +698,7 @@ exports.confirmQuotation = async (req, res) => {
     const quotation = await Quotation.findById(req.params.id);
     if (!quotation) return res.status(404).json({ success: false, message: 'Quotation not found' });
     if (!canAccessQuotation(quotation, req.user)) return res.status(403).json({ success: false, message: 'Not authorized to confirm this quotation' });
+    if (req.user.role === 'customer' && !['sent', 'negotiation'].includes(quotation.status)) return res.status(400).json({ success: false, message: 'Quotation is not ready for confirmation' });
     if (['cancelled', 'rejected'].includes(quotation.status)) return res.status(400).json({ success: false, message: 'Quotation cannot be confirmed' });
 
     const requestedDiscount = Number(quotation.negotiation.requestedDiscount || 0);
@@ -613,7 +713,7 @@ exports.confirmQuotation = async (req, res) => {
         if (riskScore.needsFinanceApproval) quotation.approvalChain.push({ role: 'finance', status: 'pending' });
         quotation.auditLog.push({ user: req.user.id, action: 'Confirmation returned to approval', reason: 'Negotiated terms exceeded discount threshold' });
         await quotation.save();
-        return res.status(200).json({ success: true, message: 'Terms require approval again', data: quotation });
+        return res.status(200).json({ success: true, message: 'Terms require approval again', data: req.user.role === 'customer' ? customerSafeQuotation(quotation) : quotation });
       }
     }
 
@@ -623,7 +723,7 @@ exports.confirmQuotation = async (req, res) => {
     quotation.negotiation.finalTerms = { discount: requestedDiscount, amount: quotation.totalAmount };
     quotation.auditLog.push({ user: req.user.id, action: 'Quotation confirmed' });
     await quotation.save();
-    res.status(200).json({ success: true, message: 'Quotation confirmed', data: quotation });
+    res.status(200).json({ success: true, message: 'Quotation confirmed', data: req.user.role === 'customer' ? customerSafeQuotation(quotation) : quotation });
   } catch (error) {
     console.error('Quotation confirmation error:', error);
     res.status(500).json({ success: false, message: 'Unable to confirm quotation' });

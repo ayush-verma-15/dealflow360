@@ -10,7 +10,8 @@ const {
   deleteWarehouse,
   updateStock,
   getWarehouseSplit,
-  getProductStock
+  getProductStock,
+  getStockMovements
 } = require('../controllers/warehouseController');
 
 // All routes are protected
@@ -18,9 +19,10 @@ router.use(protect);
 
 // Public (authenticated) routes
 router.get('/', getWarehouses);
-router.get('/:id', getWarehouse);
 router.post('/split', getWarehouseSplit);
 router.get('/product/:productId/stock', getProductStock);
+router.get('/stock-movements', authorize('admin', 'operations'), getStockMovements);
+router.get('/:id', getWarehouse);
 
 // Admin only routes
 router.post('/', authorize('admin'), createWarehouse);
@@ -28,6 +30,6 @@ router.put('/:id', authorize('admin'), updateWarehouse);
 router.delete('/:id', authorize('admin'), deleteWarehouse);
 
 // Stock management
-router.patch('/:id/stock', updateStock);
+router.patch('/:id/stock', authorize('admin', 'operations'), updateStock);
 
 module.exports = router;

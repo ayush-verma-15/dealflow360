@@ -20,7 +20,7 @@ exports.register = async (req, res) => {
       });
     }
 
-    const { name, email, password, role, company, tier } = req.body;
+    const { name, email, password, company, tier } = req.body;
 
     // Check if user exists
     const userExists = await User.findOne({ email });
@@ -36,7 +36,7 @@ exports.register = async (req, res) => {
       name,
       email,
       password,
-      role: role || 'sales_rep',
+      role: 'customer',
       company: company || '',
       tier: tier || 'Bronze'
     });
@@ -218,7 +218,8 @@ exports.updateProfile = async (req, res) => {
         email: user.email,
         role: user.role,
         tier: user.tier,
-        company: user.company
+        company: user.company,
+        phone: user.phone
       }
     });
   } catch (error) {
@@ -239,5 +240,27 @@ exports.getCustomers = async (req, res) => {
   } catch (error) {
     console.error('Get customers error:', error);
     res.status(500).json({ success: false, message: 'Unable to load customers' });
+  }
+};
+
+exports.getUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('name email role tier company isActive lastLogin createdAt').sort({ createdAt: -1 });
+    res.status(200).json({ success: true, count: users.length, data: users });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Unable to load users' });
+  }
+};
+
+exports.updateUser = async (req, res) => {
+  try {
+    const allowed = ['name', 'role', 'tier', 'company', 'isActive'];
+    const changes = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
+    const user = await User.findByIdAndUpdate(req.params.id, changes, { new: true, runValidators: true })
+      .select('name email role tier company isActive lastLogin createdAt');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Unable to update user' });
   }
 };

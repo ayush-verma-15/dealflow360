@@ -2,6 +2,8 @@
 const Warehouse = require('../models/Warehouse');
 const Product = require('../models/Product');
 const optimizeWarehouseSplit = require('../utils/warehouseSplit');
+const StockMovement = require('../models/StockMovement');
+const Fulfillment = require('../models/Fulfillment');
 
 // @desc    Get all warehouses
 // @route   GET /api/warehouses
@@ -231,6 +233,14 @@ exports.updateStock = async (req, res) => {
     }
 
     await warehouse.save();
+    await StockMovement.create({
+      warehouse: warehouse._id,
+      product: productId,
+      quantity,
+      movementType: operation === 'add' ? 'receipt' : operation === 'subtract' ? 'reservation' : 'adjustment',
+      reference: req.body.reference || 'manual-stock-update',
+      user: req.user.id
+    });
 
     res.status(200).json({
       success: true,
@@ -265,6 +275,7 @@ exports.getWarehouseSplit = async (req, res) => {
 
     const orderItems = items.map(item => {
       const product = products.find(p => p._id.toString() === item.productId);
+      if (!product || !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1) throw new Error('Invalid product or quantity');
       return {
         product: product,
         quantity: item.quantity
@@ -277,10 +288,15 @@ exports.getWarehouseSplit = async (req, res) => {
 
     // Optimize split
     const splitResult = optimizeWarehouseSplit(orderItems, warehouses);
+    const fulfillment = await Fulfillment.create({
+      quotation: req.body.quotationId,
+      split: splitResult.split,
+      backorders: splitResult.backorders
+    }).catch(() => null);
 
     res.status(200).json({
       success: true,
-      data: splitResult
+      data: { ...splitResult, fulfillmentId: fulfillment?._id || null }
     });
   } catch (error) {
     console.error('Get warehouse split error:', error);
@@ -325,4 +341,9 @@ exports.getProductStock = async (req, res) => {
       message: 'Server error'
     });
   }
+};
+
+exports.getStockMovements = async (req, res) => {
+  const movements = await StockMovement.find().populate('warehouse product user', 'name email').sort({ createdAt: -1 }).limit(100);
+  res.json({ success: true, count: movements.length, data: movements });
 };

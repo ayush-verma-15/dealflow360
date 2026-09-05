@@ -216,15 +216,17 @@ code {
   }
 }
 
-    --primary: #2563EB;
-    --primary-dark: #1D4ED8;
-    --secondary: #7C3AED;
-    --accent: #06B6D4;
-    --success: #10B981;
-    --warning: #F59E0B;
-    --danger: #EF4444;
-    --gradient: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
-    --bg-gradient: linear-gradient(135deg, #EFF6FF 0%, #F5F3FF 100%);
+:root {
+  --primary: #2563EB;
+  --primary-dark: #1D4ED8;
+  --secondary: #7C3AED;
+  --accent: #06B6D4;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --gradient: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
+  --bg-gradient: linear-gradient(135deg, #EFF6FF 0%, #F5F3FF 100%);
+}
 .fade-in {
   animation: fadeIn 0.3s ease-in-out;
 }

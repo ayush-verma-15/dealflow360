@@ -15,6 +15,7 @@
 function calculateProration(oldPlan, newPlan, changeDate, billingCycleStart, billingCycleEnd) {
   // Calculate total days in billing cycle
   const totalDays = Math.ceil((billingCycleEnd - billingCycleStart) / (1000 * 60 * 60 * 24));
+  if (totalDays <= 0) throw new Error('Billing cycle end must be after its start');
   
   // Calculate days used so far
   const daysUsed = Math.ceil((changeDate - billingCycleStart) / (1000 * 60 * 60 * 24));

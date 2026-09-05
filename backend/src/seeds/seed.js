@@ -4,6 +4,10 @@ const dotenv = require('dotenv');
 const User = require('../models/User');
 const Product = require('../models/Product');
 const Warehouse = require('../models/Warehouse');
+const Quotation = require('../models/Quotation');
+const Invoice = require('../models/Invoice');
+const Subscription = require('../models/Subscription');
+const BillingEngine = require('../utils/billingEngine');
 
 dotenv.config();
 
@@ -206,6 +210,12 @@ const importData = async () => {
     await User.deleteMany();
     await Product.deleteMany();
     await Warehouse.deleteMany();
+    await Quotation.deleteMany();
+    await Invoice.deleteMany();
+    await Subscription.deleteMany();
+    await Quotation.deleteMany();
+    await Invoice.deleteMany();
+    await Subscription.deleteMany();
     console.log('Cleared existing data');
 
     // Insert users
@@ -236,6 +246,21 @@ const importData = async () => {
 
     const createdWarehouses = await Warehouse.create(warehouseData);
     console.log(`Created ${createdWarehouses.length} warehouses`);
+
+    const salesRep = createdUsers.find((user) => user.role === 'sales_rep');
+    const customer = createdUsers.find((user) => user.email === 'acme@dealflow.com');
+    const demoQuotation = await Quotation.create({
+      customer: customer._id,
+      salesRep: salesRep._id,
+      lines: [
+        { product: productMap['Laptop Pro'], productName: 'Laptop Pro', quantity: 1, unitPrice: 50000, discountPercent: 10, taxRate: 18, lineType: 'one-time' },
+        { product: productMap['Cloud Storage'], productName: 'Cloud Storage', quantity: 1, unitPrice: 5000, discountPercent: 10, taxRate: 18, lineType: 'subscription' }
+      ],
+      approvalStatus: 'approved',
+      status: 'confirmed'
+    });
+    await BillingEngine.generateBillingSchedule(demoQuotation._id);
+    console.log('Created demo quotation with discounted invoice and subscription');
 
     console.log('\n✅ Database seeded successfully!');
     console.log('\n📋 Demo Login Credentials:');

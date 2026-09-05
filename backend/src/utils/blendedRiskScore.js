@@ -7,8 +7,8 @@ const CUSTOMER_TIER_CEILINGS = {
 const CATEGORY_CEILINGS = {
 	Hardware: 15,
 	Software: 20,
-	Service: 25,
-	Subscription: 15
+	Service: 10,
+	Subscription: 12
 };
 
 const calculateBlendedRiskScore = (lines = [], customerTier = 'Bronze') => {
@@ -38,6 +38,9 @@ const calculateBlendedRiskScore = (lines = [], customerTier = 'Bronze') => {
 	}, 0);
 	const needsFinanceApproval = maxLineViolation > 5 || weightedViolation >= 5;
 	const needsManagerApproval = maxLineViolation > 0;
+	const reasons = scoredLines
+		.filter((line) => line.violation > 0)
+		.map((line) => `${line.category || 'Product'} discount exceeds the ${line.ceiling}% ceiling by ${line.violation.toFixed(2)}%`);
 
 	return {
 		score: Number(Math.min(100, weightedViolation * 10).toFixed(2)),
@@ -46,6 +49,9 @@ const calculateBlendedRiskScore = (lines = [], customerTier = 'Bronze') => {
 		totalWeightedViolation: Number(weightedViolation.toFixed(2)),
 		needsManagerApproval,
 		needsFinanceApproval,
+		requiresManagerApproval: needsManagerApproval,
+		requiresFinanceApproval: needsFinanceApproval,
+		reasons,
 		approvalLevel: needsFinanceApproval ? 'finance' : needsManagerApproval ? 'manager' : 'none'
 	};
 };

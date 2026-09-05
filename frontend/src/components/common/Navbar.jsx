@@ -12,6 +12,12 @@ import {
   Chip,
   Badge,
   Button
+  ,Drawer
+  ,List
+  ,ListItemButton
+  ,ListItemIcon
+  ,ListItemText
+  ,Divider
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -22,6 +28,9 @@ import {
   Dashboard,
   ShoppingCart,
   Store
+  ,Info
+  ,Groups
+  ,AutoGraph
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -31,6 +40,7 @@ const Navbar = ({ onMenuClick }) => {
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState(null);
   const [notificationAnchor, setNotificationAnchor] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -52,6 +62,11 @@ const Navbar = ({ onMenuClick }) => {
     handleClose();
     logout();
     navigate('/login');
+  };
+
+  const goTo = (path) => {
+    setDrawerOpen(false);
+    navigate(path);
   };
 
   const getRoleColor = (role) => {
@@ -77,17 +92,15 @@ const Navbar = ({ onMenuClick }) => {
           edge="start"
           color="inherit"
           aria-label="menu"
-          onClick={onMenuClick}
+          onClick={() => { setDrawerOpen(true); onMenuClick?.(); }}
           sx={{ mr: 2 }}
         >
           <MenuIcon />
         </IconButton>
 
-        <Box display="flex" alignItems="center" flex={1}>
+        <Box component={Link} to="/dashboard" display="flex" alignItems="center" flex={1} sx={{ textDecoration: 'none' }} aria-label="DealFlow360 dashboard">
           <Store sx={{ mr: 1, color: 'primary.main' }} />
-          <Typography variant="h6" color="primary" fontWeight="bold">
-            DealFlow360
-          </Typography>
+          <Typography variant="h6" color="primary" fontWeight="bold">DealFlow360</Typography>
           <Chip
             label="v1.0"
             size="small"
@@ -194,7 +207,7 @@ const Navbar = ({ onMenuClick }) => {
               </Typography>
             </Box>
           </MenuItem>
-          <MenuItem onClick={handleClose}>
+          <MenuItem onClick={() => { handleClose(); navigate('/profile'); }}>
             <Person sx={{ mr: 1 }} /> Profile
           </MenuItem>
           <MenuItem onClick={handleClose}>
@@ -208,6 +221,27 @@ const Navbar = ({ onMenuClick }) => {
           </MenuItem>
         </Menu>
       </Toolbar>
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: { xs: 300, sm: 340 }, p: 2 }} role="presentation">
+          <Box sx={{ px: 1, pb: 2 }}>
+            <Typography variant="h6" color="primary" fontWeight={800}>DealFlow360</Typography>
+            <Typography variant="body2" color="text.secondary">Sales operations workspace</Typography>
+          </Box>
+          <Divider />
+          <List>
+            <ListItemButton onClick={() => goTo('/dashboard')}><ListItemIcon><Dashboard color="primary" /></ListItemIcon><ListItemText primary="Home / Dashboard" secondary="Your daily command center" /></ListItemButton>
+            <ListItemButton onClick={() => goTo('/quotations')}><ListItemIcon><ShoppingCart color="primary" /></ListItemIcon><ListItemText primary="Quotations" secondary="Create and manage deals" /></ListItemButton>
+            <ListItemButton onClick={() => goTo('/reports')}><ListItemIcon><AutoGraph color="primary" /></ListItemIcon><ListItemText primary="Reports" secondary="Revenue and pipeline insights" /></ListItemButton>
+            <ListItemButton onClick={() => goTo('/profile')}><ListItemIcon><Person color="primary" /></ListItemIcon><ListItemText primary="My Profile" secondary="Account details and role" /></ListItemButton>
+          </List>
+          <Divider />
+          <List>
+            <ListItemButton onClick={() => goTo('/about')}><ListItemIcon><Info color="primary" /></ListItemIcon><ListItemText primary="About DealFlow360" secondary="What this workspace does" /></ListItemButton>
+            <ListItemButton onClick={() => goTo('/roles')}><ListItemIcon><Groups color="primary" /></ListItemIcon><ListItemText primary="Roles & Access" secondary="Who can do what" /></ListItemButton>
+            <ListItemButton onClick={() => goTo('/features')}><ListItemIcon><AutoGraph color="primary" /></ListItemIcon><ListItemText primary="Platform Features" secondary="Quoting, risk, billing and fulfillment" /></ListItemButton>
+          </List>
+        </Box>
+      </Drawer>
     </AppBar>
   );
 };

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const calculateQuotationTotals = require('../utils/quotationTotals');
 
 const quotationSchema = new mongoose.Schema({
   quoteNumber: {
@@ -36,6 +37,8 @@ const quotationSchema = new mongoose.Schema({
       min: 0,
       max: 100
     },
+    taxRate: { type: Number, default: 0, min: 0, max: 100 },
+    taxAmount: { type: Number, default: 0, min: 0 },
     lineType: {
       type: String,
       enum: ['one-time', 'subscription'],
@@ -52,6 +55,7 @@ const quotationSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  taxAmount: { type: Number, default: 0, min: 0 },
   totalAmount: {
     type: Number,
     default: 0
@@ -97,7 +101,7 @@ const quotationSchema = new mongoose.Schema({
   // Approval Workflow
   approvalStatus: {
     type: String,
-    enum: ['draft', 'pending-manager', 'pending-finance', 'approved', 'rejected', 'negotiation'],
+    enum: ['draft', 'pending-manager', 'pending-finance', 'approved', 'rejected', 'returned-for-revision', 'negotiation'],
     default: 'draft'
   },
   approvalChain: [{
@@ -215,21 +219,11 @@ quotationSchema.pre('save', function(next) {
 
 // Calculate totals before saving
 quotationSchema.pre('save', function(next) {
-  let subtotal = 0;
-  let totalDiscount = 0;
-  
-  this.lines.forEach(line => {
-    const lineTotal = line.quantity * line.unitPrice;
-    const lineDiscount = lineTotal * (line.discountPercent / 100);
-    line.total = lineTotal - lineDiscount;
-    
-    subtotal += lineTotal;
-    totalDiscount += lineDiscount;
-  });
-  
-  this.subtotal = subtotal;
-  this.totalDiscount = totalDiscount;
-  this.totalAmount = subtotal - totalDiscount;
+  const totals = calculateQuotationTotals(this.lines);
+  this.subtotal = totals.subtotal;
+  this.totalDiscount = totals.totalDiscount;
+  this.taxAmount = totals.taxAmount;
+  this.totalAmount = totals.totalAmount;
   
   next();
 });

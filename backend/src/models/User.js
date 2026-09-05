@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['sales_rep', 'sales_manager', 'finance', 'admin', 'customer'],
+    enum: ['sales_rep', 'sales_manager', 'finance', 'operations', 'admin', 'customer'],
     default: 'sales_rep'
   },
   tier: {

@@ -10,7 +10,9 @@ export const SocketProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const socketInstance = io(process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000', {
+    const isDockerFrontend = window.location.port === '' || window.location.port === '80';
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || (isDockerFrontend ? window.location.origin : 'http://localhost:5000');
+    const socketInstance = io(socketUrl, {
       transports: ['websocket'],
       withCredentials: true
     });

@@ -7,10 +7,12 @@ const {
   getMe, 
   logout, 
   updateProfile,
-  getCustomers
+  getCustomers,
+  getUsers,
+  updateUser
 } = require('../controllers/authController');
-const { protect } = require('../middleware/auth');
-const allowedSignupRoles = ['sales_rep', 'sales_manager', 'finance', 'admin', 'customer'];
+const { protect, authorize } = require('../middleware/auth');
+const allowedSignupRoles = ['sales_rep', 'sales_manager', 'finance', 'operations', 'admin', 'customer'];
 
 // Validation rules
 const registerValidation = [
@@ -34,6 +36,8 @@ router.post('/login', loginValidation, login);
 router.get('/me', protect, getMe);
 router.post('/logout', protect, logout);
 router.put('/profile', protect, updateProfile);
-router.get('/customers', protect, getCustomers);
+router.get('/customers', protect, authorize('admin', 'sales_manager', 'sales_rep', 'finance', 'operations'), getCustomers);
+router.get('/users', protect, authorize('admin'), getUsers);
+router.patch('/users/:id', protect, authorize('admin'), updateUser);
 
 module.exports = router;

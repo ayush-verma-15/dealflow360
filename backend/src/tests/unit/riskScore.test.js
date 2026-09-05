@@ -12,11 +12,13 @@ describe('blended risk score', () => {
 		expect(result.approvalLevel).toBe('manager');
 		expect(result.needsManagerApproval).toBe(true);
 		expect(result.needsFinanceApproval).toBe(false);
+		expect(result.reasons).toHaveLength(1);
 	});
 
 	test('routes a high violation to finance', () => {
 		const result = calculateBlendedRiskScore([{ quantity: 1, unitPrice: 1000, discountPercent: 12, category: 'Hardware' }], 'Bronze');
 		expect(result.approvalLevel).toBe('finance');
 		expect(result.needsFinanceApproval).toBe(true);
+		expect(result.requiresFinanceApproval).toBe(true);
 	});
 });

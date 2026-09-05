@@ -5,7 +5,7 @@ const subscriptionSchema = new mongoose.Schema({
   subscriptionNumber: {
     type: String,
     unique: true,
-    required: true
+    required: false
   },
   quotation: {
     type: mongoose.Schema.Types.ObjectId,

@@ -66,6 +66,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateProfile = async (profile) => {
+    const response = await axios.put('/api/auth/profile', profile);
+    setUser((currentUser) => ({ ...currentUser, ...response.data.data }));
+    return response.data.data;
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
@@ -80,6 +86,7 @@ export const AuthProvider = ({ children }) => {
     token,
     login,
     register,
+    updateProfile,
     logout,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',

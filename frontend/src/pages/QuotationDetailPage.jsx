@@ -1,14 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Chip, Divider, Grid, Paper, Stack, Typography } from '@mui/material';
 import { ArrowBack, CheckCircleOutline, Download, Edit } from '@mui/icons-material';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import PageFrame from '../components/common/PageFrame';
+import api from '../services/api';
 
 const QuotationDetailPage = () => {
 	const { id } = useParams();
+	const navigate = useNavigate();
 	const [quotation, setQuotation] = useState(null);
+	const downloadPdf = async () => {
+		try {
+			const response = await api.get(`/quotes/${id}/pdf`, { responseType: 'blob' });
+			const url = URL.createObjectURL(response.data);
+			const link = document.createElement('a'); link.href = url; link.download = `${quotation.quoteNumber}.pdf`; link.click(); URL.revokeObjectURL(url);
+		} catch (error) { toast.error(error.response?.data?.message || 'Unable to download PDF'); }
+	};
 	useEffect(() => { axios.get(`/api/quotes/${id}`).then((response) => setQuotation(response.data.data)).catch(() => toast.error('Unable to load quotation')); }, [id]);
 	if (!quotation) return <PageFrame eyebrow="Quotation detail" title="Loading quotation..." />;
 	return (
@@ -37,7 +46,7 @@ const QuotationDetailPage = () => {
 						<Stack spacing={2.5} sx={{ mt: 2 }}>
 							{quotation.approvalChain?.map((step) => <Stack direction="row" spacing={1.5} key={`${step.role}-${step._id}`}><CheckCircleOutline color={step.status === 'approved' ? 'success' : 'disabled'} /><Typography>{step.role}: {step.status}</Typography></Stack>)}
 						</Stack>
-						<Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 4 }}><Button startIcon={<Edit />} variant="contained">Edit quote</Button><Button startIcon={<Download />} variant="text">Export</Button></Stack>
+						<Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 4 }}><Button startIcon={<Edit />} variant="contained" onClick={() => navigate(`/quotations?edit=${id}`)}>Edit quote</Button><Button startIcon={<Download />} variant="text" onClick={downloadPdf}>Download PDF</Button></Stack>
 					</Paper>
 				</Grid>
 			</Grid>

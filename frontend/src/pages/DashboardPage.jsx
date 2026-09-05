@@ -31,6 +31,7 @@ import {
   RocketLaunch
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import axios from 'axios';
@@ -48,7 +49,8 @@ const revenueData = [
 
 const DashboardPage = () => {
   const { user } = useAuth();
-  const { isConnected } = useSocket();
+  const navigate = useNavigate();
+  const { isConnected, onStatusChange } = useSocket();
   const [stats, setStats] = useState({
     totalQuotes: 0,
     pendingApprovals: 0,
@@ -64,6 +66,11 @@ const DashboardPage = () => {
     fetchDashboardData();
   }, []);
 
+  useEffect(() => {
+    const removeStatusListener = onStatusChange?.(() => fetchDashboardData());
+    return removeStatusListener;
+  }, [onStatusChange]);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -76,8 +83,8 @@ const DashboardPage = () => {
     }
   };
 
-  const StatCard = ({ title, value, icon, color, subtitle, growth }) => (
-    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
+  const StatCard = ({ title, value, icon, color, subtitle, growth, onClick }) => (
+    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} onClick={onClick} onKeyDown={(event) => event.key === 'Enter' && onClick?.()} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}>
       <Card className="stat-card dashboard-stat" sx={{ height: '100%' }}>
         <CardContent>
           <Box display="flex" justifyContent="space-between" alignItems="center" gap={2}>
@@ -124,6 +131,7 @@ const DashboardPage = () => {
               icon={<ShoppingCart />}
               color="var(--primary)"
               growth="+8.2%"
+              onClick={() => navigate('/quotations?status=active')}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -134,6 +142,7 @@ const DashboardPage = () => {
               color="var(--warning)"
               subtitle={`${stats.pendingApprovals} need review`}
               growth="-2.1%"
+              onClick={() => navigate('/quotations?approvalStatus=pending-manager')}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -144,6 +153,7 @@ const DashboardPage = () => {
               color="var(--success)"
               subtitle="This month"
               growth="+22.5%"
+              onClick={() => navigate('/reports?view=revenue')}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -154,6 +164,7 @@ const DashboardPage = () => {
               color="var(--secondary)"
               subtitle="Quotes to deals"
               growth="+5.3%"
+              onClick={() => navigate('/reports?view=conversion')}
             />
           </Grid>
         </Grid>

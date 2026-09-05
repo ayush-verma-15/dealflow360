@@ -13,7 +13,7 @@ const {
   getRiskScore
 } = require('../controllers/quotationController');
 
-// All routes are protected
+
 router.use(protect);
 
 // Main CRUD

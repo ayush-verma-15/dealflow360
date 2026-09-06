@@ -355,11 +355,19 @@ exports.approveQuotation = async (req, res) => {
     let role = '';
     if (req.user.role === 'sales_manager') role = 'manager';
     else if (req.user.role === 'finance') role = 'finance';
-    else {
+    else if (req.user.role === 'admin') {
+      const pendingStep = quotation.approvalChain.find((step) => step.status === 'pending');
+      role = pendingStep?.role || '';
+    }
+    if (!role) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to approve quotations'
       });
+    }
+
+    if (role === 'finance' && quotation.approvalChain.some((step) => step.role === 'manager' && step.status === 'pending')) {
+      return res.status(400).json({ success: false, message: 'Manager approval is required first' });
     }
 
     // Find pending approval step
@@ -475,11 +483,19 @@ exports.rejectQuotation = async (req, res) => {
     let role = '';
     if (req.user.role === 'sales_manager') role = 'manager';
     else if (req.user.role === 'finance') role = 'finance';
-    else {
+    else if (req.user.role === 'admin') {
+      const pendingStep = quotation.approvalChain.find((step) => step.status === 'pending');
+      role = pendingStep?.role || '';
+    }
+    if (!role) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to reject quotations'
       });
+    }
+
+    if (role === 'finance' && quotation.approvalChain.some((step) => step.role === 'manager' && step.status === 'pending')) {
+      return res.status(400).json({ success: false, message: 'Manager approval is required first' });
     }
 
     // Find pending approval step
@@ -544,7 +560,7 @@ exports.returnQuotationForRevision = async (req, res) => {
     if (!reason) return res.status(400).json({ success: false, message: 'Please provide a reason for revision' });
     const quotation = await Quotation.findById(req.params.id);
     if (!quotation) return res.status(404).json({ success: false, message: 'Quotation not found' });
-    const role = req.user.role === 'sales_manager' ? 'manager' : req.user.role === 'finance' ? 'finance' : null;
+    const role = req.user.role === 'sales_manager' ? 'manager' : req.user.role === 'finance' ? 'finance' : req.user.role === 'admin' ? quotation.approvalChain.find((item) => item.status === 'pending')?.role : null;
     if (!role) return res.status(403).json({ success: false, message: 'Not authorized to return quotations' });
     const step = quotation.approvalChain.find((item) => item.role === role && item.status === 'pending');
     if (!step) return res.status(400).json({ success: false, message: 'No pending approval for this role' });
